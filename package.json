@@ -1,0 +1,26 @@
+{
+  "name": "nebula-social-demo",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Nebula — PWA demo di un social network con SQL.js e IndexedDB",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "node scripts/build.mjs",
+    "preview": "vite preview",
+    "icons": "pwa-assets-generator --preset minimal-2023 public/logo.svg"
+  },
+  "dependencies": {
+    "@fontsource-variable/manrope": "^5.2.8",
+    "@fontsource-variable/space-grotesk": "^5.2.10",
+    "sql.js": "^1.13.0"
+  },
+  "devDependencies": {
+    "@types/sql.js": "^1.4.9",
+    "@vite-pwa/assets-generator": "^1.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2",
+    "vite-plugin-pwa": "^1.2.0"
+  }
+}

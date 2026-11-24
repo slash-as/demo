@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#09090f"/>
+      <stop offset="1" stop-color="#12101f"/>
+    </linearGradient>
+    <radialGradient id="violet" cx="0" cy="0" r="1" gradientTransform="translate(300 260) scale(420)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8b5cf6" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cyan" cx="0" cy="0" r="1" gradientTransform="translate(920 180) scale(400)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22d3ee" stop-opacity=".85"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="pink" cx="0" cy="0" r="1" gradientTransform="translate(760 690) scale(430)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f472b6" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#f472b6" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" width="34" height="34" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1.5" fill="#ffffff" opacity=".12"/>
+    </pattern>
+    <filter id="blur"><feGaussianBlur stdDeviation="40"/></filter>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <g filter="url(#blur)">
+    <circle cx="300" cy="260" r="300" fill="url(#violet)"/>
+    <circle cx="920" cy="180" r="280" fill="url(#cyan)"/>
+    <circle cx="760" cy="690" r="320" fill="url(#pink)"/>
+  </g>
+  <rect width="1200" height="800" fill="url(#dots)"/>
+  <g fill="none" stroke="#ffffff" opacity=".2">
+    <circle cx="600" cy="400" r="250" stroke-width="1"/>
+    <circle cx="600" cy="400" r="340" stroke-width="1" opacity=".5"/>
+    <ellipse cx="600" cy="400" rx="430" ry="170" stroke-width="1" transform="rotate(-18 600 400)"/>
+    <ellipse cx="600" cy="400" rx="160" ry="390" stroke-width="1" transform="rotate(24 600 400)" opacity=".5"/>
+  </g>
+  <circle cx="600" cy="400" r="118" fill="#ffffff" opacity=".06"/>
+  <circle cx="600" cy="400" r="118" fill="none" stroke="#ffffff" stroke-opacity=".28"/>
+  <circle cx="600" cy="400" r="8" fill="#ffffff" opacity=".8"/>
+  <g fill="#ffffff">
+    <circle cx="198" cy="618" r="3" opacity=".8"/>
+    <circle cx="1024" cy="540" r="4" opacity=".6"/>
+    <circle cx="940" cy="310" r="2.5" opacity=".7"/>
+    <circle cx="430" cy="170" r="2" opacity=".6"/>
+  </g>
+</svg>

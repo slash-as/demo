@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="orb" x1="128" y1="96" x2="400" y2="416" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a78bfa"/>
+      <stop offset=".48" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(214 184) rotate(52) scale(260)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="#08080e"/>
+  <circle cx="256" cy="256" r="148" fill="url(#orb)"/>
+  <circle cx="256" cy="256" r="148" fill="url(#glow)"/>
+  <path d="M256 188c6 34 16 44 50 50-34 6-44 16-50 50-6-34-16-44-50-50 34-6 44-16 50-50Z" fill="#ffffff" opacity=".92"/>
+</svg>

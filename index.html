@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Nebula: una demo di social network PWA con SQLite nel browser (SQL.js) e persistenza in IndexedDB."
+    />
+    <meta name="theme-color" content="#07070b" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon-180x180.png" />
+    <title>Nebula · Social Demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --boot-bg: #07070b;
+        --boot-text: #f4f4f8;
+        --boot-muted: #8d8da3;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--boot-bg);
+        color: var(--boot-text);
+        font-family: 'Segoe UI', system-ui, sans-serif;
+      }
+      .boot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 18px;
+        background:
+          radial-gradient(520px 360px at 50% 35%, rgba(139, 92, 246, 0.16), transparent 70%),
+          var(--boot-bg);
+        z-index: 100;
+        transition: opacity 0.35s ease, visibility 0.35s ease;
+      }
+      .boot.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+      .boot-orb {
+        width: 74px;
+        height: 74px;
+        border-radius: 50%;
+        background: conic-gradient(from 210deg, #22d3ee, #8b5cf6, #f472b6, #22d3ee);
+        box-shadow: 0 0 44px rgba(139, 92, 246, 0.45);
+        animation: boot-spin 2.6s linear infinite;
+        position: relative;
+      }
+      .boot-orb::after {
+        content: '';
+        position: absolute;
+        inset: 15px;
+        border-radius: 50%;
+        background: var(--boot-bg);
+      }
+      .boot-name {
+        margin: 4px 0 0;
+        font-size: 1.35rem;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+      }
+      .boot-copy {
+        margin: 0;
+        color: var(--boot-muted);
+        font-size: 0.82rem;
+        letter-spacing: 0.04em;
+      }
+      .boot-error {
+        max-width: 340px;
+        margin-top: 8px;
+        padding: 12px 16px;
+        border: 1px solid rgba(248, 113, 113, 0.35);
+        border-radius: 12px;
+        color: #fca5a5;
+        font-size: 0.8rem;
+        line-height: 1.5;
+        text-align: center;
+      }
+      .boot-retry {
+        margin-top: 4px;
+        padding: 10px 20px;
+        border: 0;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #8b5cf6, #22d3ee);
+        color: #fff;
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) {
+        .boot-orb { animation: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="boot" class="boot" role="status" aria-live="polite">
+      <div class="boot-orb" aria-hidden="true"></div>
+      <p class="boot-name">Nebula</p>
+      <p class="boot-copy">Accendo il database nel browser…</p>
+    </div>
+
+    <div id="app"></div>
+    <div id="toasts" class="toasts" aria-live="polite" aria-atomic="false"></div>
+
+    <noscript>
+      <p style="padding: 24px; text-align: center">
+        Nebula ha bisogno di JavaScript per far girare SQLite nel browser.
+      </p>
+    </noscript>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

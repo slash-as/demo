@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="night" x1="600" y1="0" x2="600" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#070b22"/>
+      <stop offset=".55" stop-color="#141239"/>
+      <stop offset="1" stop-color="#2a1240"/>
+    </linearGradient>
+    <radialGradient id="moon" cx="0" cy="0" r="1" gradientTransform="translate(920 180) scale(140)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff7e6" stop-opacity=".55"/>
+      <stop offset=".45" stop-color="#ffe9c7" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#ffe9c7" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="reflection" x1="600" y1="620" x2="600" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22d3ee" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#night)"/>
+  <circle cx="920" cy="180" r="140" fill="url(#moon)"/>
+  <circle cx="920" cy="180" r="52" fill="#fff3d6" opacity=".9"/>
+  <g fill="#ffffff" opacity=".5">
+    <circle cx="160" cy="120" r="2"/>
+    <circle cx="290" cy="220" r="1.5"/>
+    <circle cx="470" cy="90" r="2.5"/>
+    <circle cx="660" cy="190" r="1.5"/>
+    <circle cx="1080" cy="100" r="2"/>
+    <circle cx="760" cy="80" r="1.2"/>
+  </g>
+  <g fill="#0a0c22">
+    <rect x="0" y="470" width="120" height="220"/>
+    <rect x="140" y="420" width="90" height="270"/>
+    <rect x="250" y="510" width="150" height="180"/>
+    <rect x="420" y="460" width="80" height="230"/>
+    <rect x="520" y="530" width="130" height="160"/>
+    <rect x="670" y="490" width="100" height="200"/>
+    <rect x="790" y="440" width="150" height="250"/>
+    <rect x="960" y="520" width="110" height="170"/>
+    <rect x="1090" y="470" width="110" height="220"/>
+  </g>
+  <g fill="#22d3ee" opacity=".55">
+    <rect x="160" y="450" width="12" height="8" rx="2"/>
+    <rect x="190" y="450" width="12" height="8" rx="2"/>
+    <rect x="160" y="480" width="12" height="8" rx="2"/>
+    <rect x="280" y="540" width="12" height="8" rx="2"/>
+    <rect x="310" y="540" width="12" height="8" rx="2"/>
+    <rect x="340" y="570" width="12" height="8" rx="2"/>
+    <rect x="440" y="490" width="12" height="8" rx="2"/>
+    <rect x="820" y="470" width="12" height="8" rx="2"/>
+    <rect x="850" y="470" width="12" height="8" rx="2"/>
+    <rect x="820" y="500" width="12" height="8" rx="2"/>
+    <rect x="990" y="550" width="12" height="8" rx="2"/>
+  </g>
+  <g fill="#0a0c22">
+    <path d="M180 470h150l-18-34h-114Z"/>
+    <path d="M200 436h110l-14-28H214Z"/>
+    <path d="M218 408h74l-10-24h-54Z"/>
+    <rect x="252" y="384" width="6" height="30"/>
+    <rect x="240" y="470" width="12" height="140"/>
+    <rect x="260" y="470" width="12" height="140"/>
+  </g>
+  <g stroke="#0a0c22" stroke-width="14" fill="none">
+    <path d="M920 470v180M850 470v180"/>
+    <path d="M820 486h150"/>
+    <path d="M836 450h118"/>
+  </g>
+  <rect y="640" width="1200" height="160" fill="#080a1c"/>
+  <rect y="640" width="1200" height="160" fill="url(#reflection)"/>
+  <g stroke="#22d3ee" stroke-width="2" opacity=".3">
+    <path d="M850 700h140"/>
+    <path d="M880 730h80"/>
+    <path d="M250 690h120"/>
+    <path d="M280 720h60"/>
+  </g>
+  <g fill="#f472b6">
+    <circle cx="700" cy="640" r="5" opacity=".8"/>
+    <circle cx="740" cy="640" r="5" opacity=".6"/>
+    <circle cx="780" cy="640" r="5" opacity=".4"/>
+  </g>
+</svg>

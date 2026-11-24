@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0b0a12"/>
+      <stop offset="1" stop-color="#181022"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0" cy="0" r="1" gradientTransform="translate(420 390) scale(330)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8b5cf6" stop-opacity=".45"/>
+      <stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="disc" x1="300" y1="270" x2="540" y2="510" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a2540"/>
+      <stop offset="1" stop-color="#0c0a14"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="650" y1="0" x2="1100" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22d3ee"/>
+      <stop offset=".55" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#f472b6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <circle cx="420" cy="390" r="330" fill="url(#halo)"/>
+  <circle cx="420" cy="390" r="210" fill="url(#disc)" stroke="#ffffff" stroke-opacity=".12" stroke-width="2"/>
+  <g fill="none" stroke="#ffffff" stroke-opacity=".08">
+    <circle cx="420" cy="390" r="180" stroke-width="1"/>
+    <circle cx="420" cy="390" r="150" stroke-width="1"/>
+    <circle cx="420" cy="390" r="120" stroke-width="1"/>
+    <circle cx="420" cy="390" r="90" stroke-width="1"/>
+    <circle cx="420" cy="390" r="60" stroke-width="1"/>
+  </g>
+  <circle cx="420" cy="390" r="34" fill="#f472b6" opacity=".9"/>
+  <circle cx="420" cy="390" r="12" fill="#0b0a12"/>
+  <g stroke="url(#wave)" stroke-width="10" stroke-linecap="round">
+    <path d="M680 400v-30"/>
+    <path d="M716 400v-92"/>
+    <path d="M752 400v-48"/>
+    <path d="M788 400v-148"/>
+    <path d="M824 400v-70"/>
+    <path d="M860 400v-200"/>
+    <path d="M896 400v-96"/>
+    <path d="M932 400v-160"/>
+    <path d="M968 400v-54"/>
+    <path d="M1004 400v-122"/>
+    <path d="M1040 400v-36"/>
+    <path d="M1076 400v-84"/>
+  </g>
+  <g stroke="url(#wave)" stroke-width="10" stroke-linecap="round" opacity=".35">
+    <path d="M680 470v30"/>
+    <path d="M716 470v92"/>
+    <path d="M752 470v48"/>
+    <path d="M788 470v148"/>
+    <path d="M824 470v70"/>
+    <path d="M860 470v200"/>
+    <path d="M896 470v96"/>
+    <path d="M932 470v160"/>
+    <path d="M968 470v54"/>
+    <path d="M1004 470v122"/>
+    <path d="M1040 470v36"/>
+    <path d="M1076 470v84"/>
+  </g>
+  <rect x="680" y="436" width="396" height="1" fill="#ffffff" opacity=".12"/>
+  <g fill="#ffffff" opacity=".45">
+    <circle cx="1100" cy="180" r="2.5"/>
+    <circle cx="1180" cy="300" r="1.5"/>
+    <circle cx="620" cy="140" r="2"/>
+    <circle cx="740" cy="680" r="1.5"/>
+  </g>
+</svg>
