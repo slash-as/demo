@@ -8,6 +8,9 @@ export interface User {
   bio: string;
   avatar_url: string;
   created_at: string;
+  is_following?: boolean;
+  follower_count?: number;
+  following_count?: number;
 }
 
 export interface Post {
@@ -21,7 +24,6 @@ export interface Post {
   like_count: number;
   comment_count: number;
   liked?: boolean;
-  is_following?: boolean;
 }
 
 export interface Comment {
@@ -61,6 +63,35 @@ class ApiRepo {
     } catch {
       return null;
     }
+  }
+
+  // Toggle like
+  async toggleLike(userId: number, postId: number): Promise<boolean> {
+    const response = await api.likePost(postId);
+    return response.ok;
+  }
+
+  // Toggle follow
+  async toggleFollow(userId: number, targetUserId: number): Promise<boolean> {
+    const response = await api.followUser(targetUserId);
+    return response.ok;
+  }
+
+  // Get user by ID
+  getUser(id: number): User | null {
+    const users = this.users.filter(user => user.id === id);
+    return users.length > 0 ? users[0] : null;
+  }
+
+  // Get post by ID
+  getPost(id: number, currentUserId: number): Post | null {
+    const posts = this.posts.filter(post => post.id === id);
+    return posts.length > 0 ? posts[0] : null;
+  }
+
+  // List all users
+  listUsers(): User[] {
+    return this.users;
   }
 
   // Post
@@ -173,7 +204,7 @@ export class FeedHelper {
   static getSuggestedUsers(users: User[], currentUserId: number, limit: number = 6): User[] {
     return users
       .filter(user => user.id !== currentUserId)
-      .sort((a, b) => b.follower_count - a.follower_count)
+      .sort((a, b) => (b as any).follower_count - (a as any).follower_count)
       .slice(0, limit);
   }
 
@@ -188,6 +219,15 @@ export class FeedHelper {
     return Object.entries(tagCounts)
       .map(([tag, count]) => ({ tag, count }))
       .sort((a, b) => b.count - a.count);
+  }
+
+  static searchUsers(users: User[], query: string): User[] {
+    const lowercaseQuery = query.toLowerCase();
+    return users.filter(user => 
+      user.username.toLowerCase().includes(lowercaseQuery) ||
+      user.bio?.toLowerCase().includes(lowercaseQuery) ||
+      user.email.toLowerCase().includes(lowercaseQuery)
+    );
   }
 }
 

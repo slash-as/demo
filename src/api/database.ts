@@ -43,7 +43,8 @@ export class ApiDatabase {
     try {
       // Per ora carichiamo tutti gli utenti disponibili
       // In un'app reale, questo potrebbe essere ottimizzato
-      this.users = await repo.searchUsers('');
+      const searchResults = await repo.searchUsers('');
+      this.users = searchResults;
     } catch (error) {
       console.error('Failed to load users:', error);
       this.users = [];
@@ -168,13 +169,13 @@ export class ApiDatabase {
         // Aggiorna lo stato del follow nell'utente
         const user = this.users.find(u => u.id === userId);
         if (user) {
-          user.is_following = !user.is_following;
-          user.follower_count += user.is_following ? 1 : -1;
+          (user as any).is_following = !(user as any).is_following;
+          (user as any).follower_count += (user as any).is_following ? 1 : -1;
         }
         
         // Aggiorna il conteggio dei following per l'utente corrente
         if (this.currentUser) {
-          this.currentUser.following_count += 1;
+          (this.currentUser as any).following_count += 1;
         }
         
         await this.loadStats(); // Aggiorna le statistiche
@@ -199,7 +200,7 @@ export class ApiDatabase {
       // Per ora, assumiamo che l'utente segua tutti gli altri utenti demo
       // In un'app reale, avremmo bisogno di ottenere la lista dei seguiti
       const followingIds = this.users
-        .filter(user => user.id !== userId && user.is_following)
+        .filter(user => user.id !== userId && (user as any).is_following)
         .map(user => user.id);
       
       return FeedHelper.filterPostsFollowing(this.posts, userId, followingIds);

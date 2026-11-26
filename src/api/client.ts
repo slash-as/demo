@@ -69,7 +69,7 @@ class ApiClient {
 
     // Aggiungi l'auth header se c'è un token
     if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
     }
 
     try {

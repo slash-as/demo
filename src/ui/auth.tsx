@@ -1,5 +1,5 @@
 // Componente di autenticazione
-import { api, getCurrentUserFromStorage, isAuthenticated } from '../api/client';
+import { authManager } from '../api/client';
 
 interface AuthState {
   user: any | null;
@@ -9,7 +9,7 @@ interface AuthState {
 
 class AuthManager {
   private state: AuthState = {
-    user: getCurrentUserFromStorage(),
+    user: null,
     loading: false,
     error: null,
   };
@@ -37,7 +37,7 @@ class AuthManager {
     this.notify();
 
     try {
-      const response = await api.login(email, password);
+      const response = await authManager.login(email, password);
       if (response.ok && response.data) {
         this.state.user = response.data.user;
         this.state.loading = false;
@@ -63,7 +63,7 @@ class AuthManager {
     this.notify();
 
     try {
-      const response = await api.register(username, email, password);
+      const response = await authManager.register(username, email, password);
       if (response.ok && response.data) {
         this.state.user = response.data.user;
         this.state.loading = false;
@@ -84,21 +84,21 @@ class AuthManager {
   }
 
   async logout(): Promise<void> {
-    await api.logout();
+    await authManager.logout();
     this.state.user = null;
     this.state.error = null;
     this.notify();
   }
 
   async checkAuth(): Promise<boolean> {
-    if (!isAuthenticated()) {
+    if (!authManager.isAuthenticated()) {
       this.state.user = null;
       this.notify();
       return false;
     }
 
     try {
-      const response = await api.getCurrentUser();
+      const response = await authManager.getCurrentUser();
       if (response.ok && response.data) {
         this.state.user = response.data;
         this.notify();
@@ -139,7 +139,12 @@ export function renderAuthModal(): string {
             <span class="eyebrow">Benvenuto su Nebula</span>
             <h2 id="auth-modal-title">${state.user ? 'Il tuo profilo' : 'Accedi o registrati'}</h2>
           </div>
-          <button class="icon-btn" data-action="close-auth-modal" aria-label="Chiudi">${icon('x', 19)}</button>
+          <button class="icon-btn" data-action="close-auth-modal" aria-label="Chiudi">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </header>
         <div class="auth-content">
           ${state.user ? renderUserProfile(state.user) : renderAuthForms()}
@@ -174,65 +179,38 @@ function renderAuthForms(): string {
   return `
     <div class="auth-forms">
       <div class="auth-tabs">
-        <button class="auth-tab ${!state.registerMode ? 'is-active' : ''}" data-action="login-tab">Login</button>
-        <button class="auth-tab ${state.registerMode ? 'is-active' : ''}" data-action="register-tab">Registrati</button>
+        <button class="auth-tab is-active" data-action="login-tab">Login</button>
+        <button class="auth-tab" data-action="register-tab">Registrati</button>
       </div>
 
-      ${state.registerMode ? renderRegisterForm() : renderLoginForm()}
+      <form class="auth-form" id="login-form">
+        <div class="form-group">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" name="email" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" name="password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" ${authManager.getState().loading ? 'disabled' : ''}>
+          Accedi
+        </button>
+      </form>
       
-      ${state.error ? `<div class="auth-error">${escapeHtml(state.error)}</div>` : ''}
+      ${authManager.getState().error ? `<div class="auth-error">${escapeHtml(authManager.getState().error)}</div>` : ''}
       
-      ${state.loading ? '<div class="auth-loading">Caricamento...</div>' : ''}
+      ${authManager.getState().loading ? '<div class="auth-loading">Caricamento...</div>' : ''}
+      
+      <div class="auth-demo">
+        <p>Oppure prova gli account demo:</p>
+        <div class="demo-accounts">
+          <button class="demo-btn" data-email="aurora@nebula.demo">aurora@nebula.demo</button>
+          <button class="demo-btn" data-email="leo@nebula.demo">leo@nebula.demo</button>
+          <button class="demo-btn" data-email="mia@nebula.demo">mia@nebula.demo</button>
+        </div>
+        <p class="demo-note">Usa qualsiasi password per gli account demo</p>
+      </div>
     </div>
-  `;
-}
-
-function renderLoginForm(): string {
-  return `
-    <form class="auth-form" id="login-form">
-      <div class="form-group">
-        <label for="login-email">Email</label>
-        <input type="email" id="login-email" name="email" required autocomplete="email">
-      </div>
-      <div class="form-group">
-        <label for="login-password">Password</label>
-        <input type="password" id="login-password" name="password" required autocomplete="current-password">
-      </div>
-      <button type="submit" class="btn btn-primary btn-block" ${state.loading ? 'disabled' : ''}>
-        Accedi
-      </button>
-    </form>
-    <div class="auth-demo">
-      <p>Oppure prova gli account demo:</p>
-      <div class="demo-accounts">
-        <button class="demo-btn" data-email="aurora@nebula.demo">aurora@nebula.demo</button>
-        <button class="demo-btn" data-email="leo@nebula.demo">leo@nebula.demo</button>
-        <button class="demo-btn" data-email="mia@nebula.demo">mia@nebula.demo</button>
-      </div>
-      <p class="demo-note">Usa qualsiasi password per gli account demo</p>
-    </div>
-  `;
-}
-
-function renderRegisterForm(): string {
-  return `
-    <form class="auth-form" id="register-form">
-      <div class="form-group">
-        <label for="register-username">Username</label>
-        <input type="text" id="register-username" name="username" required minlength="3" maxlength="20">
-      </div>
-      <div class="form-group">
-        <label for="register-email">Email</label>
-        <input type="email" id="register-email" name="email" required autocomplete="email">
-      </div>
-      <div class="form-group">
-        <label for="register-password">Password</label>
-        <input type="password" id="register-password" name="password" required minlength="6">
-      </div>
-      <button type="submit" class="btn btn-primary btn-block" ${state.loading ? 'disabled' : ''}>
-        Registrati
-      </button>
-    </form>
   `;
 }
 
@@ -241,14 +219,6 @@ function escapeHtml(text: string): string {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
-}
-
-function icon(name: string, size: number): string {
-  // Implementa la tua funzione icon o usa un'icon library
-  return `<svg class="icon icon-${name}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <!-- Placeholder per l'icona ${name} -->
-    <circle cx="12" cy="12" r="10"></circle>
-  </svg>`;
 }
 
 // Gestione eventi per il modal di autenticazione
@@ -264,14 +234,14 @@ export function setupAuthModal(): void {
     
     // Switch tra login e registrazione
     if (target.closest('[data-action="login-tab"]')) {
-      authManager.setState({ ...authManager.getState(), registerMode: false });
-      renderAuthModal();
+      document.querySelector('#login-form')!.style.display = 'block';
+      document.querySelector('#register-form')!.style.display = 'none';
       return;
     }
     
     if (target.closest('[data-action="register-tab"]')) {
-      authManager.setState({ ...authManager.getState(), registerMode: true });
-      renderAuthModal();
+      document.querySelector('#login-form')!.style.display = 'none';
+      document.querySelector('#register-form')!.style.display = 'block';
       return;
     }
     
