@@ -103,8 +103,10 @@ function showLoginScreen(): void {
     const password = formData.get('password') as string;
 
     try {
-      await apiClient.signIn(identifier, password);
-      window.location.reload();
+      const result = await apiClient.signIn(identifier, password);
+      if (result.success) {
+        window.location.reload();
+      }
     } catch (err) {
       errorDiv.textContent = 'Email/Username o password non validi';
       errorDiv.style.display = 'block';
@@ -172,8 +174,10 @@ function showSignupForm(email: string, password: string): void {
     const username = formData.get('username') as string;
 
     try {
-      await apiClient.signUp(email, password, username);
-      window.location.reload();
+      const result = await apiClient.signUp(email, password, username);
+      if (result.success) {
+        window.location.reload();
+      }
     } catch (err) {
       errorDiv.textContent = 'Registrazione fallita. L\'email potrebbe essere già usata.';
       errorDiv.style.display = 'block';
@@ -201,10 +205,12 @@ function addLogoutButton(): void {
       try {
         await apiClient.signOut();
         localStorage.removeItem('nebula:me');
+        localStorage.removeItem('nebula:token');
         window.location.reload();
       } catch (error) {
         console.error('Logout fallito:', error);
         localStorage.removeItem('nebula:me');
+        localStorage.removeItem('nebula:token');
         window.location.reload();
       }
     });
@@ -252,7 +258,12 @@ async function boot(): Promise<void> {
         });
     }
   } catch (error) {
-    if (error instanceof Error && error.message.includes('Authentication required')) {
+    console.error('Boot error:', error);
+    
+    // For deployed version, if we get a 404, show login screen
+    if (window.location.hostname === 'slash-as.github.io') {
+      showLoginScreen();
+    } else if (error instanceof Error && error.message.includes('Authentication required')) {
       // Utente non autenticato, mostra schermata di login
       showLoginScreen();
     } else {
