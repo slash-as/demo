@@ -1,249 +1,269 @@
-// Main entry point per Nebula con autenticazione
-import { App } from './ui/app';
-import { authManager, setupAuthModal } from './ui/auth';
-import { repo } from './api/repo';
+import '@fontsource-variable/manrope';
+import '@fontsource-variable/space-grotesk';
+import './styles.css';
+
+import { apiClient } from './api/client';
 import { icon } from './ui/icons';
+import { initPwaInstall } from './pwa';
+import { App } from './ui/app';
 
-// Inizializzazione
-async function init() {
-  // Controlla l'autenticazione all'avvio
-  const isAuthenticated = await authManager.checkAuth();
-  
-  // Setup event listeners
-  setupAuthModal();
-  
-  // Setup bottone di login nell'header
-  setupLoginButton();
-  
-  // Inizializza l'app se l'utente è autenticato, altrimenti mostra la schermata di login
-  if (isAuthenticated) {
-    initializeApp();
-  } else {
-    showLoginScreen();
-  }
-}
+const ME_STORAGE_KEY = 'nebula:me';
 
-function setupLoginButton() {
-  // Aggiungi un pulsante di login nell'header se non esiste
-  const existingButton = document.querySelector('[data-action="show-login"]');
-  if (!existingButton) {
-    const header = document.querySelector('.mobile-topbar') || document.querySelector('.sidebar');
-    if (header) {
-      const loginButton = document.createElement('button');
-      loginButton.className = 'btn btn-ghost btn-sm login-btn';
-      loginButton.setAttribute('data-action', 'show-login');
-      loginButton.innerHTML = `${icon('user', 16)} Login`;
-      header.appendChild(loginButton);
+/**
+ * Le immagini caricate dall'utente possono essere rotte:
+ * le nascondiamo per lasciare visibile l'avatar di fallback.
+ */
+document.addEventListener(
+  'error',
+  (event) => {
+    if (event.target instanceof HTMLImageElement) {
+      event.target.classList.add('is-broken');
     }
-  }
-  
-  // Event listener per il pulsante di login
-  document.addEventListener('click', (event) => {
-    const target = event.target as HTMLElement;
-    if (target.closest('[data-action="show-login"]')) {
-      showAuthModal();
-    }
-  });
+  },
+  true,
+);
+
+function hideBootScreen(): void {
+  const boot = document.getElementById('boot');
+  if (!boot) return;
+
+  boot.classList.add('is-hidden');
+  window.setTimeout(() => boot.remove(), 450);
 }
 
-function showAuthModal() {
-  const modal = document.createElement('div');
-  modal.innerHTML = renderAuthModal();
-  document.body.appendChild(modal);
-  
-  // Focus sul primo input
-  setTimeout(() => {
-    modal.querySelector('input')?.focus();
-  }, 100);
+function showBootError(error: unknown): void {
+  const boot = document.getElementById('boot');
+  if (!boot) return;
+
+  boot.innerHTML = '';
+
+  const orb = document.createElement('div');
+  orb.className = 'boot-orb';
+  orb.setAttribute('aria-hidden', 'true');
+
+  const title = document.createElement('p');
+  title.className = 'boot-name';
+  title.textContent = 'Qualcosa è andato storto';
+
+  const copy = document.createElement('p');
+  copy.className = 'boot-error';
+  copy.textContent =
+    error instanceof Error
+      ? error.message
+      : 'Impossibile connettersi al backend Neon. Controlla la connessione e riprova.';
+
+  const retry = document.createElement('button');
+  retry.className = 'boot-retry';
+  retry.type = 'button';
+  retry.textContent = 'Riprova';
+  retry.addEventListener('click', () => window.location.reload());
+
+  boot.append(orb, title, copy, retry);
 }
 
-function showLoginScreen() {
-  const app = document.getElementById('app');
-  if (!app) return;
-  
-  app.innerHTML = `
-    <div class="login-screen">
-      <div class="login-container">
-        <div class="login-header">
-          <img src="./logo.svg" alt="Nebula" class="login-logo">
-          <h1>Nebula</h1>
-          <p>Il tuo social network su Neon</p>
-        </div>
-        
-        <div class="login-forms">
-          <div class="auth-tabs">
-            <button class="auth-tab ${!authManager.getState().registerMode ? 'is-active' : ''}" data-action="login-tab">Login</button>
-            <button class="auth-tab ${authManager.getState().registerMode ? 'is-active' : ''}" data-action="register-tab">Registrati</button>
-          </div>
+function showLoginScreen(): void {
+  const boot = document.getElementById('boot');
+  if (!boot) return;
 
-          ${authManager.getState().registerMode ? renderRegisterForm() : renderLoginForm()}
-          
-          ${authManager.getState().error ? `<div class="auth-error">${escapeHtml(authManager.getState().error)}</div>` : ''}
-          
-          ${authManager.getState().loading ? '<div class="auth-loading">Caricamento...</div>' : ''}
-        </div>
-        
-        <div class="login-footer">
-          <p>Prova gli account demo:</p>
-          <div class="demo-accounts">
-            <button class="demo-btn" data-email="aurora@nebula.demo">aurora@nebula.demo</button>
-            <button class="demo-btn" data-email="leo@nebula.demo">leo@nebula.demo</button>
-            <button class="demo-btn" data-email="mia@nebula.demo">mia@nebula.demo</button>
-          </div>
-        </div>
-      </div>
+  boot.innerHTML = '';
+
+  const orb = document.createElement('div');
+  orb.className = 'boot-orb';
+  orb.setAttribute('aria-hidden', 'true');
+
+  const title = document.createElement('p');
+  title.className = 'boot-name';
+  title.textContent = 'Nebula - Accesso';
+
+  const loginForm = document.createElement('form');
+  loginForm.className = 'login-form';
+  loginForm.innerHTML = `
+    <div class="field">
+      <label>Email o Username</label>
+      <input type="text" name="identifier" required placeholder="email@example.com o username">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" name="password" required placeholder="••••••••">
+    </div>
+    <div class="login-actions">
+      <button type="submit" class="btn btn-primary">Accedi</button>
+      <button type="button" class="btn btn-ghost" id="signup-btn">Registrati</button>
     </div>
   `;
-  
-  // Setup form handlers
-  setupFormHandlers();
-}
 
-function renderLoginForm(): string {
-  return `
-    <form class="auth-form" id="login-form">
-      <div class="form-group">
-        <label for="login-email">Email</label>
-        <input type="email" id="login-email" name="email" required autocomplete="email">
-      </div>
-      <div class="form-group">
-        <label for="login-password">Password</label>
-        <input type="password" id="login-password" name="password" required autocomplete="current-password">
-      </div>
-      <button type="submit" class="btn btn-primary btn-block" ${authManager.getState().loading ? 'disabled' : ''}>
-        Accedi
-      </button>
-    </form>
-  `;
-}
+  const errorDiv = document.createElement('div');
+  errorDiv.className = 'login-error';
+  errorDiv.style.display = 'none';
 
-function renderRegisterForm(): string {
-  return `
-    <form class="auth-form" id="register-form">
-      <div class="form-group">
-        <label for="register-username">Username</label>
-        <input type="text" id="register-username" name="username" required minlength="3" maxlength="20">
-      </div>
-      <div class="form-group">
-        <label for="register-email">Email</label>
-        <input type="email" id="register-email" name="email" required autocomplete="email">
-      </div>
-      <div class="form-group">
-        <label for="register-password">Password</label>
-        <input type="password" id="register-password" name="password" required minlength="6">
-      </div>
-      <button type="submit" class="btn btn-primary btn-block" ${authManager.getState().loading ? 'disabled' : ''}>
-        Registrati
-      </button>
-    </form>
-  `;
-}
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(loginForm);
+    const identifier = formData.get('identifier') as string;
+    const password = formData.get('password') as string;
 
-function setupFormHandlers() {
-  // Login form
-  const loginForm = document.getElementById('login-form');
-  if (loginForm) {
-    loginForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const email = (loginForm.elements.namedItem('email') as HTMLInputElement).value;
-      const password = (loginForm.elements.namedItem('password') as HTMLInputElement).value;
-      
-      const success = await authManager.login(email, password);
-      if (success) {
-        initializeApp();
-      }
-    });
-  }
-  
-  // Register form
-  const registerForm = document.getElementById('register-form');
-  if (registerForm) {
-    registerForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const username = (registerForm.elements.namedItem('username') as HTMLInputElement).value;
-      const email = (registerForm.elements.namedItem('email') as HTMLInputElement).value;
-      const password = (registerForm.elements.namedItem('password') as HTMLInputElement).value;
-      
-      const success = await authManager.register(username, email, password);
-      if (success) {
-        initializeApp();
-      }
-    });
-  }
-  
-  // Demo accounts
-  document.addEventListener('click', (event) => {
-    const target = event.target as HTMLElement;
-    if (target.classList.contains('demo-btn')) {
-      const email = target.dataset.email;
-      if (email) {
-        authManager.login(email, 'demo123').then(success => {
-          if (success) {
-            initializeApp();
-          }
-        });
-      }
-    }
-    
-    // Tab switching
-    if (target.classList.contains('auth-tab')) {
-      const isRegisterTab = target.textContent === 'Registrati';
-      authManager.setState({ ...authManager.getState(), registerMode: isRegisterTab });
-      
-      // Re-render the form
-      if (isRegisterTab) {
-        document.querySelector('.auth-forms')!.innerHTML = renderRegisterForm();
-      } else {
-        document.querySelector('.auth-forms')!.innerHTML = renderLoginForm();
-      }
-      
-      // Re-setup form handlers
-      setupFormHandlers();
+    try {
+      await apiClient.signIn(identifier, password);
+      window.location.reload();
+    } catch (err) {
+      errorDiv.textContent = 'Email/Username o password non validi';
+      errorDiv.style.display = 'block';
     }
   });
+
+  const signupBtn = loginForm.querySelector('#signup-btn') as HTMLButtonElement;
+  signupBtn.addEventListener('click', () => {
+    const identifier = (loginForm.querySelector('input[name="identifier"]') as HTMLInputElement).value;
+    const password = (loginForm.querySelector('input[name="password"]') as HTMLInputElement).value;
+    
+    if (identifier && password) {
+      // Assume che l'input sia un'email per la registrazione
+      showSignupForm(identifier, password);
+    }
+  });
+
+  boot.append(orb, title, loginForm, errorDiv);
 }
 
-function initializeApp() {
-  const currentUser = authManager.getState().user;
-  if (!currentUser) {
-    showLoginScreen();
-    return;
+function showSignupForm(email: string, password: string): void {
+  const boot = document.getElementById('boot');
+  if (!boot) return;
+
+  boot.innerHTML = '';
+
+  const orb = document.createElement('div');
+  orb.className = 'boot-orb';
+  orb.setAttribute('aria-hidden', 'true');
+
+  const title = document.createElement('p');
+  title.className = 'boot-name';
+  title.textContent = 'Nebula - Registrazione';
+
+  const signupForm = document.createElement('form');
+  signupForm.className = 'login-form';
+  signupForm.innerHTML = `
+    <div class="field">
+      <label>Email</label>
+      <input type="email" name="email" value="${email}" required placeholder="email@example.com">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" name="password" value="${password}" required placeholder="••••••••">
+    </div>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" name="username" required placeholder="username">
+    </div>
+    <div class="login-actions">
+      <button type="submit" class="btn btn-primary">Registrati</button>
+      <button type="button" class="btn btn-ghost" id="back-to-login">Indietro</button>
+    </div>
+  `;
+
+  const errorDiv = document.createElement('div');
+  errorDiv.className = 'login-error';
+  errorDiv.style.display = 'none';
+
+  signupForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(signupForm);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+    const username = formData.get('username') as string;
+
+    try {
+      await apiClient.signUp(email, password, username);
+      window.location.reload();
+    } catch (err) {
+      errorDiv.textContent = 'Registrazione fallita. L\'email potrebbe essere già usata.';
+      errorDiv.style.display = 'block';
+    }
+  });
+
+  const backBtn = signupForm.querySelector('#back-to-login') as HTMLButtonElement;
+  backBtn.addEventListener('click', () => showLoginScreen());
+
+  boot.append(orb, title, signupForm, errorDiv);
+}
+
+// Funzione per mostrare il pulsante di logout nell'header
+function addLogoutButton(): void {
+  const accountButton = document.querySelector('.account-button');
+  if (!accountButton) return;
+
+  // Aggiungi il pulsante di logout solo se non esiste già
+  if (!accountButton.querySelector('.logout-btn')) {
+    const logoutBtn = document.createElement('button');
+    logoutBtn.className = 'btn btn-ghost btn-sm logout-btn';
+    logoutBtn.innerHTML = `${icon('logout', 14)} Esci`;
+    logoutBtn.style.marginTop = '8px';
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await apiClient.signOut();
+        localStorage.removeItem('nebula:me');
+        window.location.reload();
+      } catch (error) {
+        console.error('Logout fallito:', error);
+        localStorage.removeItem('nebula:me');
+        window.location.reload();
+      }
+    });
+
+    // Inserisci il pulsante prima dell'elemento esistente
+    accountButton.insertBefore(logoutBtn, accountButton.firstChild);
   }
-  
-  // Inizializza l'app con l'utente corrente
-  const app = new App(currentUser.id);
-  app.mount();
-  
-  // Aggiorna l'UI per mostrare l'utente autenticato
-  updateAuthUI(currentUser);
 }
 
-function updateAuthUI(user: any) {
-  // Rimuovi schermata di login se presente
-  const loginScreen = document.querySelector('.login-screen');
-  if (loginScreen) {
-    loginScreen.remove();
+async function boot(): Promise<void> {
+  try {
+    // Prova a caricare lo snapshot dal backend
+    const snapshot = await apiClient.loadSnapshot();
+    
+    if (!snapshot.me) {
+      // Utente non autenticato, mostra schermata di login
+      showLoginScreen();
+      return;
+    }
+
+    // Utente autenticato, salva i dati e avvia l'app
+    localStorage.setItem(ME_STORAGE_KEY, String(snapshot.me.id));
+
+    const app = new App(snapshot);
+    app.mount();
+
+    // Aggiungi il pulsante di logout
+    addLogoutButton();
+
+    initPwaInstall(() => app.refresh());
+
+    // Gestione eventi di rete (non più necessari per il sync locale)
+    window.addEventListener('online', () => app.refresh());
+    window.addEventListener('offline', () => app.refresh());
+
+    hideBootScreen();
+
+    if (import.meta.env.PROD) {
+      void import('virtual:pwa-register')
+        .then(({ registerSW }) => {
+          registerSW({ immediate: true });
+        })
+        .catch((error: unknown) => {
+          console.error('[Nebula] Registrazione service worker fallita', error);
+        });
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Authentication required')) {
+      // Utente non autenticato, mostra schermata di login
+      showLoginScreen();
+    } else {
+      // Altri errori di connessione
+      console.error(error);
+      showBootError(error);
+    }
   }
-  
-  // Aggiorna il pulsante di login nell'header
-  const loginBtn = document.querySelector('.login-btn');
-  if (loginBtn) {
-    loginBtn.innerHTML = `${icon('user', 16)} @${user.username}`;
-    loginBtn.setAttribute('data-action', 'show-profile');
-  }
 }
 
-// Helper functions
-function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// Gestione errori globali
-window.addEventListener('error', (event) => {
-  console.error('Global error:', event.error);
+void boot().catch((error: unknown) => {
+  console.error(error);
+  showBootError(error);
 });
-
-// Avvia l'applicazione
-init().catch(console.error);

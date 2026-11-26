@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
-      content="Nebula: social network PWA con backend su Neon, autenticazione, API RESTful e database PostgreSQL in tempo reale."
+      content="Nebula: una demo di social network PWA con SQLite nel browser (SQL.js) e persistenza in IndexedDB."
     />
     <meta name="theme-color" content="#07070b" />
     <meta name="color-scheme" content="dark" />
@@ -102,7 +102,7 @@
     <div id="boot" class="boot" role="status" aria-live="polite">
       <div class="boot-orb" aria-hidden="true"></div>
       <p class="boot-name">Nebula</p>
-      <p class="boot-copy">Connessione al backend su Neon…</p>
+      <p class="boot-copy">Accendo il database nel browser…</p>
     </div>
 
     <div id="app"></div>
@@ -110,10 +110,10 @@
 
     <noscript>
       <p style="padding: 24px; text-align: center">
-        Nebula ha bisogno di JavaScript per funzionare con il backend e il database su Neon.
+        Nebula ha bisogno di JavaScript per far girare SQLite nel browser.
       </p>
     </noscript>
 
-    <script type="module" src="/src/simple-app.ts"></script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

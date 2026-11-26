@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Nebula — social network PWA con Postgres, Auth, Storage, Functions e Realtime su Neon",
+  "description": "Nebula — social network PWA demo con SQLite nel browser e backend Neon opzionale",
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc --noEmit",
@@ -26,8 +26,7 @@
     "@neon/realtime": "^0.2.2",
     "hono": "^4.13.22",
     "jose": "^6.2.18",
-    "pg": "^8.23.1",
-    "sql.js": "^1.13.0"
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@types/node": "^26.6.11",

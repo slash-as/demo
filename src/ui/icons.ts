@@ -33,7 +33,11 @@ export type IconName =
   | 'alert'
   | 'globe'
   | 'bolt'
-  | 'dots';
+  | 'dots'
+  | 'logout'
+  | 'lock'
+  | 'info'
+  | 'shield';
 
 const ICONS: Record<IconName, string> = {
   home: '<path d="m3 10.5 9-7.5 9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/>',
@@ -87,6 +91,10 @@ const ICONS: Record<IconName, string> = {
     '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3Z"/>',
   bolt: '<path d="m13 2-9 12h7l-1 8 9-12h-7l1-8Z"/>',
   dots: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  shield: '<path d="M12 2L3 7v5.6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V7l-9-5Z"/>',
 };
 
 export function icon(name: IconName, size = 20, className = ''): string {

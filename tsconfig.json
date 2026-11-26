@@ -18,8 +18,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "verbatimModuleSyntax": true,
-    "jsx": "react-jsx",
-    "jsxImportSource": "hastx",
     "types": ["vite/client", "vite-plugin-pwa/client", "node"]
   },
   "include": ["src", "server", "neon.ts", "vite.config.ts"]

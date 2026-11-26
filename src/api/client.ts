@@ -1,36 +1,56 @@
-// API client per Nebula su Neon
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://br-frosty-feather-bht6iizc-api.compute.c-10.eu-central-1.aws.neon.tech';
+import { createAuthClient } from '@neon/auth';
 
-interface ApiResponse<T = any> {
-  ok: boolean;
-  data?: T;
-  error?: string;
+// Configurazione API
+const API_BASE_URL = 'https://br-frosty-feather-bht6iizc-api.compute.c-10.eu-central-1.aws.neon.tech';
+const AUTH_BASE_URL = 'https://ep-sweet-pond-bh26q3q1.neonauth.c-10.eu-central-1.aws.neon.tech/neondb/auth';
+
+// Tipi snapshot dal backend
+export interface Snapshot {
+  me: User | null;
+  users: User[];
+  posts: PostView[];
+  comments: CommentView[];
+  follows: Follow[];
+  stats: DbStats;
+  revision: string;
+  services: {
+    realtime: boolean;
+    storage: boolean;
+  };
 }
 
-interface User {
+export interface UserSuggestion extends User {
+  follower_count: number;
+  is_following: number;
+}
+
+export interface User {
   id: number;
   username: string;
   email: string;
   bio: string;
   avatar_url: string;
   created_at: string;
+  post_count?: number;
+  follower_count?: number;
+  following_count?: number;
 }
 
-interface Post {
+export interface PostView {
   id: number;
   user_id: number;
   content: string;
-  media_url?: string;
+  media_url: string | null;
   created_at: string;
   username: string;
   avatar_url: string;
   like_count: number;
   comment_count: number;
-  liked?: boolean;
-  is_following?: boolean;
+  liked: number;
+  is_following: number;
 }
 
-interface Comment {
+export interface CommentView {
   id: number;
   post_id: number;
   user_id: number;
@@ -40,231 +60,253 @@ interface Comment {
   avatar_url: string;
 }
 
-interface AuthResponse {
-  user: User;
-  token: string;
+export interface Follow {
+  follower_id: number;
+  followee_id: number;
+  created_at: string;
 }
 
-class ApiClient {
-  private token: string | null = null;
+export interface DbStats {
+  users: number;
+  posts: number;
+  comments: number;
+  likes: number;
+  follows: number;
+  popular_tags?: Array<{
+    tag: string;
+    count: number;
+  }>;
+}
+
+// Client API con autenticazione Neon
+export class NeonApiClient {
+  private auth: any;
 
   constructor() {
-    // Recupera il token dal localStorage se esiste
-    const savedToken = localStorage.getItem('nebula:token');
-    if (savedToken) {
-      this.token = savedToken;
-    }
+    this.auth = createAuthClient(AUTH_BASE_URL);
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
-    const url = `${API_BASE_URL}${endpoint}`;
-    
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
+  // Ottieni il JWT token per le richieste API
+  private async getAuthToken(): Promise<string> {
+    const token = await this.auth.getJWTToken(true);
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+    return token;
+  }
 
-    // Aggiungi l'auth header se c'è un token
-    if (this.token) {
-      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
+  // Carica lo snapshot iniziale
+  async loadSnapshot(): Promise<Snapshot> {
+    const token = await this.getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/bootstrap`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load snapshot: ${response.status}`);
     }
 
+    return response.json();
+  }
+
+  // Ottieni lo stato di autenticazione corrente
+  async getSession() {
+    return await this.auth.getSession();
+  }
+
+  // Login con email/username e password
+  async signIn(identifier: string, password: string) {
+    // Prima prova con email, se fallisce prova con username
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
+      return await this.auth.signIn.email({
+        email: identifier,
+        password,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return {
-          ok: false,
-          error: errorData.error || response.statusText,
-        };
-      }
-
-      const data = await response.json();
-      return {
-        ok: true,
-        data,
-      };
-    } catch (error) {
-      return {
-        ok: false,
-        error: error instanceof Error ? error.message : 'Network error',
-      };
+    } catch {
+      // Se il login con email fallisce, potremmo dover gestire il login con username
+      // Neon Auth supportata attualmente solo login con email
+      throw new Error('Login fallito. Verifica email e password.');
     }
   }
 
-  // Autenticazione
-  async login(email: string, password: string): Promise<ApiResponse<AuthResponse>> {
-    const response = await this.request<AuthResponse>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
+  // Registrazione con email, username e password
+  async signUp(email: string, password: string, username: string) {
+    return await this.auth.signUp.email({
+      email,
+      password,
+      name: username,
     });
-
-    if (response.ok && response.data) {
-      this.token = response.data.token;
-      localStorage.setItem('nebula:token', this.token);
-      localStorage.setItem('nebula:user', JSON.stringify(response.data.user));
-    }
-
-    return response;
   }
 
-  async register(username: string, email: string, password: string): Promise<ApiResponse<AuthResponse>> {
-    const response = await this.request<AuthResponse>('/auth/register', {
+  // Logout
+  async signOut() {
+    return await this.auth.signOut();
+  }
+
+  // Crea un nuovo post
+  async createPost(content: string, mediaUrl?: string | null) {
+    const token = await this.getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/posts`, {
       method: 'POST',
-      body: JSON.stringify({ username, email, password }),
-    });
-
-    if (response.ok && response.data) {
-      this.token = response.data.token;
-      localStorage.setItem('nebula:token', this.token);
-      localStorage.setItem('nebula:user', JSON.stringify(response.data.user));
-    }
-
-    return response;
-  }
-
-  async logout(): Promise<void> {
-    this.token = null;
-    localStorage.removeItem('nebula:token');
-    localStorage.removeItem('nebula:user');
-  }
-
-  // Ottieni l'utente corrente
-  async getCurrentUser(): Promise<ApiResponse<User>> {
-    const response = await this.request<User>('/me');
-    return response;
-  }
-
-  // Post
-  async getPosts(): Promise<ApiResponse<Post[]>> {
-    const response = await this.request<Post[]>('/posts');
-    return response;
-  }
-
-  async createPost(content: string, mediaUrl?: string): Promise<ApiResponse<Post>> {
-    const response = await this.request<Post>('/posts', {
-      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ content, media_url: mediaUrl }),
     });
-    return response;
+
+    if (!response.ok) {
+      throw new Error(`Failed to create post: ${response.status}`);
+    }
+
+    return response.json();
   }
 
-  async deletePost(postId: number): Promise<ApiResponse<void>> {
-    const response = await this.request<void>(`/posts/${postId}`, {
+  // Elimina un post
+  async deletePost(postId: number) {
+    const token = await this.getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/posts/${postId}`, {
       method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
     });
-    return response;
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete post: ${response.status}`);
+    }
+
+    return response.json();
   }
 
-  async likePost(postId: number): Promise<ApiResponse<void>> {
-    const response = await this.request<void>(`/posts/${postId}/like`, {
+  // Aggiungi/un like a un post
+  async toggleLike(postId: number) {
+    const token = await this.getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/posts/${postId}/like`, {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
     });
-    return response;
+
+    if (!response.ok) {
+      throw new Error(`Failed to toggle like: ${response.status}`);
+    }
+
+    return response.json();
   }
 
-  async addComment(postId: number, content: string): Promise<ApiResponse<Comment>> {
-    const response = await this.request<Comment>(`/posts/${postId}/comments`, {
+  // Aggiungi un commento a un post
+  async addComment(postId: number, content: string) {
+    const token = await this.getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/posts/${postId}/comments`, {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ content }),
     });
-    return response;
+
+    if (!response.ok) {
+      throw new Error(`Failed to add comment: ${response.status}`);
+    }
+
+    return response.json();
   }
 
-  // Utenti
-  async getUserProfile(username: string): Promise<ApiResponse<User>> {
-    const response = await this.request<User>(`/users/${username}`);
-    return response;
-  }
-
-  async followUser(userId: number): Promise<ApiResponse<void>> {
-    const response = await this.request<void>(`/users/${userId}/follow`, {
+  // Segui/unfollow un utente
+  async toggleFollow(userId: number) {
+    const token = await this.getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/follow`, {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
     });
-    return response;
+
+    if (!response.ok) {
+      throw new Error(`Failed to toggle follow: ${response.status}`);
+    }
+
+    return response.json();
   }
 
-  async searchUsers(query: string): Promise<ApiResponse<User[]>> {
-    const response = await this.request<User[]>(`/users/search?q=${encodeURIComponent(query)}`);
-    return response;
-  }
-
-  // Profilo
-  async updateProfile(bio: string, avatarUrl: string): Promise<ApiResponse<User>> {
-    const response = await this.request<User>('/me', {
+  // Aggiorna il profilo utente
+  async updateProfile(bio: string, avatarUrl: string) {
+    const token = await this.getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/me`, {
       method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ bio, avatar_url: avatarUrl }),
     });
-    return response;
+
+    if (!response.ok) {
+      throw new Error(`Failed to update profile: ${response.status}`);
+    }
+
+    return response.json();
   }
 
-  // Upload
-  async uploadFile(file: File): Promise<ApiResponse<{ url: string; key: string }>> {
+  // Upload file per media (immagini/video)
+  async uploadFile(file: File): Promise<string> {
+    const token = await this.getAuthToken();
+    
+    // Validazione del file
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm'];
+    
+    if (file.size > maxSize) {
+      throw new Error('Il file è troppo grande. Dimensione massima: 10MB');
+    }
+    
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error('Tipo di file non supportato. Sono consentite immagini (JPEG, PNG, GIF, WebP) e video (MP4, WebM)');
+    }
+
     const formData = new FormData();
     formData.append('file', file);
 
-    const headers: HeadersInit = {};
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    const response = await fetch(`${API_BASE_URL}/uploads`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload fallito: ${response.status}`);
     }
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/uploads`, {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return {
-          ok: false,
-          error: errorData.error || response.statusText,
-        };
-      }
-
-      const data = await response.json();
-      return {
-        ok: true,
-        data,
-      };
-    } catch (error) {
-      return {
-        ok: false,
-        error: error instanceof Error ? error.message : 'Upload failed',
-      };
-    }
+    const result = await response.json();
+    return result.url;
   }
 
-  // Health check
-  async health(): Promise<ApiResponse> {
-    const response = await this.request('/health');
-    return response;
+  // Funzione helper per creare un post con file
+  async createPostWithContent(content: string, file?: File): Promise<any> {
+    let mediaUrl: string | null = null;
+    
+    if (file) {
+      try {
+        mediaUrl = await this.uploadFile(file);
+      } catch (error) {
+        throw new Error(`Upload del file fallito: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`);
+      }
+    }
+    
+    return await this.createPost(content, mediaUrl);
   }
 }
 
-// Esporta un'istanza singleton
-export const api = new ApiClient();
-
-// Helper per ottenere l'utente corrente dal localStorage
-export const getCurrentUserFromStorage = (): User | null => {
-  const userJson = localStorage.getItem('nebula:user');
-  if (!userJson) return null;
-  try {
-    return JSON.parse(userJson);
-  } catch {
-    return null;
-  }
-};
-
-// Helper per verificare se l'utente è autenticato
-export const isAuthenticated = (): boolean => {
-  return !!localStorage.getItem('nebula:token');
-};
+// Esportazione istanza singleton
+export const apiClient = new NeonApiClient();

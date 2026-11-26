@@ -1,6 +1,4 @@
-import * as apiDatabase from '../api/database';
-import * as repo from '../api/repo';
-import type { FeedScope, PostView, User, UserSuggestion } from '../api/repo';
+import { apiClient, type Snapshot, type User, type PostView, type CommentView, type UserSuggestion } from '../api/client';
 import { canInstall, promptInstall } from '../pwa';
 import {
   avatar,
@@ -19,21 +17,20 @@ import { icon, type IconName } from './icons';
 type View = 'home' | 'explore' | 'profile';
 type ToastTone = 'success' | 'info' | 'error';
 
-const ME_STORAGE_KEY = 'nebula:me';
+
 
 interface AppState {
   view: View;
-  meId: number;
-  feedTab: FeedScope;
+  snapshot: Snapshot;
+  feedTab: 'all' | 'following';
   profileUsername: string | null;
   commentsOpen: Set<number>;
   drafts: Map<string, string>;
   mediaOpen: boolean;
   search: string;
   accountOpen: boolean;
-  dbOpen: boolean;
   editProfileOpen: boolean;
-  resetArmed: boolean;
+  neonInfoOpen: boolean;
 }
 
 function excerpt(text: string, max = 118): string {
@@ -44,23 +41,19 @@ function excerpt(text: string, max = 118): string {
 export class App {
   private readonly root: HTMLElement;
   private readonly state: AppState;
-  private me: User;
 
-  constructor() {
+  constructor(snapshot: Snapshot) {
     const root = document.querySelector<HTMLElement>('#app');
     if (!root) throw new Error('Elemento #app non trovato.');
 
-    // Ottieni l'utente corrente dall'API
-    const currentUser = apiDatabase.getCurrentUser();
-    if (!currentUser) {
-      throw new Error('Nessun utente autenticato. Effettua il login prima di continuare.');
+    if (!snapshot.me) {
+      throw new Error('Nessun utente autenticato.');
     }
 
     this.root = root;
-    this.me = currentUser;
     this.state = {
       view: 'home',
-      meId: currentUser.id,
+      snapshot,
       feedTab: 'all',
       profileUsername: null,
       commentsOpen: new Set<number>(),
@@ -68,25 +61,11 @@ export class App {
       mediaOpen: false,
       search: '',
       accountOpen: false,
-      dbOpen: false,
       editProfileOpen: false,
-      resetArmed: false,
+      neonInfoOpen: false,
     };
 
-    // Carica i dati iniziali
-    this.loadData().then(() => {
-      this.bindEvents();
-    });
-  }
-
-  private async loadData(): Promise<void> {
-    try {
-      await apiDatabase.refresh();
-      this.render();
-    } catch (error) {
-      console.error('Failed to load initial data:', error);
-      this.notify('Errore nel caricamento dei dati', 'error');
-    }
+    this.bindEvents();
   }
 
   mount(): void {
@@ -136,11 +115,11 @@ export class App {
     this.root.addEventListener('keydown', (event) => this.handleKeydown(event));
   }
 
-  private async refreshMe(): Promise<User> {
-    const me = apiDatabase.getCurrentUser();
-    if (!me) throw new Error('Utente corrente non trovato.');
-    this.me = me;
-    return me;
+  private refreshMe(): User {
+    if (!this.state.snapshot.me) {
+      throw new Error('Utente corrente non trovato.');
+    }
+    return this.state.snapshot.me;
   }
 
   private render(): void {
@@ -161,8 +140,8 @@ export class App {
       </div>
       ${this.mobileNav(me)}
       ${this.state.accountOpen ? this.accountModal(me) : ''}
-      ${this.state.dbOpen ? this.dbModal() : ''}
       ${this.state.editProfileOpen ? this.profileEditModal(me) : ''}
+      ${this.state.neonInfoOpen ? this.neonInfoModal() : ''}
     `;
   }
 
@@ -242,10 +221,15 @@ export class App {
         </button>
 
         <div class="sidebar-foot">
-          <button class="side-link" data-action="open-db">
-            ${icon('database', 16)}
-            <span>Database</span>
-            <span class="side-link-meta">SQL.js</span>
+          <button class="side-link" data-action="refresh-data">
+            ${icon('refresh', 16)}
+            <span>Aggiorna dati</span>
+            <span class="side-link-meta">Neon</span>
+          </button>
+          <button class="side-link" data-action="show-neon-info">
+            ${icon('info', 16)}
+            <span>Info Neon</span>
+            <span class="side-link-meta">DB</span>
           </button>
           <span class="net-status" data-network></span>
         </div>
@@ -261,8 +245,8 @@ export class App {
           <span class="brand-word">nebula<span class="brand-dot">.</span></span>
         </button>
         <div class="mobile-topbar-actions">
-          <button class="icon-btn" data-action="open-db" aria-label="Apri il database">${icon('database', 19)}</button>
-          <button class="mobile-account" data-action="toggle-account" aria-label="Cambia account demo">
+          <button class="icon-btn" data-action="refresh-data" aria-label="Aggiorna dati">${icon('refresh', 19)}</button>
+          <button class="mobile-account" data-action="toggle-account" aria-label="Account">
             ${avatar(me, 'sm')}
           </button>
         </div>
@@ -289,18 +273,22 @@ export class App {
     `;
   }
 
-  private async renderHome(me: User): Promise<string> {
-    const posts = await apiDatabase.listFeed(me.id, this.state.feedTab);
-    const stats = await apiDatabase.getStats();
+  private renderHome(me: User): string {
+    // Filtra i post in base alla tab selezionata
+    let posts = this.state.snapshot.posts;
+    if (this.state.feedTab === 'following') {
+      const followingIds = this.state.snapshot.follows.map(f => f.followee_id);
+      posts = posts.filter(post => followingIds.includes(post.user_id));
+    }
 
     return `
       <header class="view-head">
         <div>
           <span class="eyebrow">${greeting()}, ${escapeHtml(displayName(me.username))}</span>
           <h1>La tua <span class="grad-text">orbita</span></h1>
-          <p>La timeline del social network. Connesso con il backend su Neon.</p>
+          <p>La timeline di Nebula. I dati sono salvati su Neon.</p>
         </div>
-        <div class="live-pill"><span class="live-dot"></span> ${stats.posts} post live</div>
+        <div class="live-pill"><span class="live-dot"></span> ${this.state.snapshot.stats.posts} post live</div>
       </header>
 
       ${this.composer(me)}
@@ -330,7 +318,6 @@ export class App {
 
   private composer(me: User): string {
     const draft = this.state.drafts.get('composer') ?? '';
-    const mediaDraft = this.state.drafts.get('media') ?? '';
     const nearLimit = draft.length > 250;
 
     return `
@@ -351,21 +338,20 @@ export class App {
             <span class="composer-media-icon">${icon('image', 16)}</span>
             <input
               id="media-input"
-              type="text"
-              name="media"
-              data-draft="media"
-              inputmode="url"
-              value="${escapeHtml(mediaDraft)}"
-              placeholder="URL immagine oppure media/mesh.svg"
-              aria-label="URL immagine del post"
+              type="file"
+              name="file"
+              accept="image/*,video/*"
+              aria-label="Scegli immagine o video"
             >
+            <div class="composer-media-tools">
+              <button type="button" class="tool-btn ${this.state.mediaOpen ? 'is-active' : ''}" data-action="toggle-media" aria-label="Aggiungi media" title="Aggiungi media">
+                ${icon('image', 18)}
+              </button>
+            </div>
           </div>
 
           <div class="composer-actions">
             <div class="composer-tools">
-              <button type="button" class="tool-btn ${this.state.mediaOpen ? 'is-active' : ''}" data-action="toggle-media" aria-label="Aggiungi immagine" title="Aggiungi immagine">
-                ${icon('image', 18)}
-              </button>
               <span class="char-counter ${nearLimit ? 'is-near' : ''}" data-counter>${draft.length}/280</span>
             </div>
             <button class="btn btn-primary btn-sm" type="submit" data-post-btn ${draft.trim() ? '' : 'disabled'}>
@@ -429,7 +415,8 @@ export class App {
   }
 
   private commentsSection(post: PostView, me: User): string {
-    const comments = repo.listComments(post.id);
+    // Filtra i commenti dallo snapshot
+    const comments = this.state.snapshot.comments.filter(c => c.post_id === post.id);
     const draft = this.state.drafts.get(`comment:${post.id}`) ?? '';
 
     return `
@@ -439,7 +426,7 @@ export class App {
             comments.length
               ? comments
                   .map(
-                    (comment) => `
+                    (comment: CommentView) => `
                     <div class="comment">
                       <button class="comment-avatar" data-action="profile" data-username="${escapeHtml(comment.username)}" aria-label="Profilo di @${escapeHtml(comment.username)}">
                         ${avatar(comment, 'xs')}
@@ -476,13 +463,13 @@ export class App {
     `;
   }
 
-  private async renderExplore(me: User): Promise<string> {
+  private renderExplore(me: User): string {
     return `
       <header class="view-head">
         <div>
           <span class="eyebrow">Scopri</span>
           <h1>Nuove <span class="grad-text">costellazioni</span></h1>
-          <p>Persone, idee e post che stanno girando nel social network.</p>
+          <p>Persone, idee e post che stanno girando nella demo.</p>
         </div>
       </header>
 
@@ -509,7 +496,12 @@ export class App {
     const query = this.state.search.trim();
 
     if (query) {
-      const results = repo.searchUsers(query, me.id);
+      // Cerca utenti nello snapshot
+      const results = this.state.snapshot.users.filter(user => 
+        user.username.toLowerCase().includes(query.toLowerCase()) ||
+        user.bio.toLowerCase().includes(query.toLowerCase()) ||
+        user.email.toLowerCase().includes(query.toLowerCase())
+      );
 
       return `
         <section class="card panel">
@@ -530,8 +522,9 @@ export class App {
       `;
     }
 
-    const suggestions = repo.listSuggestedUsers(me.id, 6);
-    const trending = repo.listTrendingPosts(me.id, 4);
+    // Usa suggerimenti e trending dallo snapshot
+    const suggestions = this.state.snapshot.users.slice(0, 6);
+    const trending = this.state.snapshot.posts.slice(0, 4);
 
     return `
       <section class="card panel">
@@ -584,14 +577,27 @@ export class App {
   }
 
   private trendingTagsCard(): string {
-    const tags = repo.getTrendingTags(6);
+    // Estrae hashtag dai post nello snapshot
+    const tagCounts = new Map<string, number>();
+    for (const post of this.state.snapshot.posts) {
+      const matches = post.content.matchAll(/#([\p{L}\p{N}_]+)/gu);
+      for (const match of matches) {
+        const tag = match[1].toLowerCase();
+        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      }
+    }
+
+    const tags = Array.from(tagCounts.entries())
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+      .slice(0, 6);
 
     return `
       <section class="card panel">
         <div class="section-head">
           <div>
             <span class="eyebrow">Hashtag</span>
-            <h2>Tendenze nel database</h2>
+            <h2>Tendenze su Neon</h2>
           </div>
           ${icon('bolt', 18, 'head-icon')}
         </div>
@@ -610,20 +616,27 @@ export class App {
   }
 
   private renderProfile(username: string, me: User): string {
-    const profile = repo.getProfile(username, me.id);
-
-    if (!profile) {
+    // Cerca l'utente nello snapshot
+    const user = this.state.snapshot.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    
+    if (!user) {
       return this.emptyState(
         'users',
         'Profilo non trovato',
-        `@${username} non esiste in questo database.`,
+        `@${username} non esiste su Neon.`,
         `<button class="btn btn-primary btn-sm" data-action="nav" data-view="home">Torna alla home</button>`,
       );
     }
 
-    const user = profile.user;
-    const posts = repo.listPostsByUser(user.id, me.id);
+    // Filtra i post dell'utente
+    const posts = this.state.snapshot.posts.filter(post => post.user_id === user.id);
     const isMe = user.id === me.id;
+    
+    // Calcola statistiche dallo snapshot
+    const followerCount = this.state.snapshot.follows.filter(f => f.followee_id === user.id).length;
+    const followingCount = this.state.snapshot.follows.filter(f => f.follower_id === user.id).length;
+    const postCount = posts.length;
+    const isFollowing = this.state.snapshot.follows.some(f => f.follower_id === me.id && f.followee_id === user.id);
 
     return `
       <section class="profile-hero">
@@ -640,7 +653,7 @@ export class App {
               ${
                 isMe
                   ? `<button class="btn btn-ghost btn-sm" data-action="edit-profile">${icon('edit', 15)} Modifica profilo</button>`
-                  : this.followButton(user.id, Boolean(profile.is_following), false)
+                  : this.followButton(user.id, isFollowing, false)
               }
             </div>
           </div>
@@ -654,21 +667,21 @@ export class App {
             ${
               isMe
                 ? `<span>${icon('mail', 14)} ${escapeHtml(user.email)}</span>`
-                : `<span>${icon('users', 14)} ${formatCount(profile.follower_count)} follower</span>`
+                : `<span>${icon('users', 14)} ${formatCount(followerCount)} follower</span>`
             }
           </div>
 
           <div class="profile-stats">
-            <div><strong>${formatCount(profile.post_count)}</strong><span>post</span></div>
-            <div><strong>${formatCount(profile.follower_count)}</strong><span>follower</span></div>
-            <div><strong>${formatCount(profile.following_count)}</strong><span>seguiti</span></div>
+            <div><strong>${formatCount(postCount)}</strong><span>post</span></div>
+            <div><strong>${formatCount(followerCount)}</strong><span>follower</span></div>
+            <div><strong>${formatCount(followingCount)}</strong><span>seguiti</span></div>
           </div>
         </div>
       </section>
 
       <div class="section-title">
         <h2>${isMe ? 'I tuoi post' : `Post di @${escapeHtml(user.username)}`}</h2>
-        <span class="muted">${posts.length} nel database</span>
+        <span class="muted">${posts.length} su Neon</span>
       </div>
 
       <div class="feed">
@@ -689,10 +702,9 @@ export class App {
   }
 
   private rail(me: User): string {
-    const profile = repo.getProfile(me.username, me.id);
-    const suggestions = repo.listSuggestedUsers(me.id, 3);
-    const tags = repo.getTrendingTags(5);
-    const stats = repo.getStats();
+    // Usa i dati dallo snapshot
+    const suggestions = this.state.snapshot.users.slice(0, 3);
+    const stats = this.state.snapshot.stats;
 
     return `
       <aside class="rail">
@@ -707,9 +719,9 @@ export class App {
             <span class="handle">@${escapeHtml(me.username)}</span>
             <p>${escapeHtml(me.bio || 'Nessuna bio, per ora.')}</p>
             <div class="rail-stats">
-              <div><strong>${formatCount(profile?.post_count ?? 0)}</strong><span>post</span></div>
-              <div><strong>${formatCount(profile?.follower_count ?? 0)}</strong><span>follower</span></div>
-              <div><strong>${formatCount(profile?.following_count ?? 0)}</strong><span>seguiti</span></div>
+              <div><strong>${formatCount(me.post_count ?? 0)}</strong><span>post</span></div>
+              <div><strong>${formatCount(me.follower_count ?? 0)}</strong><span>follower</span></div>
+              <div><strong>${formatCount(me.following_count ?? 0)}</strong><span>seguiti</span></div>
             </div>
             <button class="btn btn-ghost btn-sm btn-block" data-action="profile" data-username="${escapeHtml(me.username)}">Vedi profilo</button>
           </div>
@@ -734,12 +746,14 @@ export class App {
             ${icon('bolt', 16, 'head-icon')}
           </div>
           <div class="tag-list">
-            ${tags
-              .map(
-                (tag) =>
-                  `<span class="tag-chip tag-chip-sm"><span class="tag-hash">#</span>${escapeHtml(tag.tag)}<small>${tag.count}</small></span>`,
-              )
-              .join('')}
+            ${stats?.popular_tags?.length
+              ? stats.popular_tags
+                  .map(
+                    (tag: any) =>
+                      `<span class="tag-chip tag-chip-sm"><span class="tag-hash">#</span>${escapeHtml(tag.tag)}<small>${tag.count}</small></span>`,
+                  )
+                  .join('')
+              : '<p class="muted small">Nessuna tendenza al momento</p>'}
           </div>
         </section>
 
@@ -761,7 +775,7 @@ export class App {
 
         <footer class="rail-footer">
           <span class="brand-word">nebula<span class="brand-dot">.</span></span>
-          <span>demo · dati locali · zero backend</span>
+          <span>social network su Neon PostgreSQL</span>
         </footer>
       </aside>
     `;
@@ -787,22 +801,22 @@ export class App {
     `;
   }
 
-  private userRow(user: UserSuggestion, me: User): string {
+  private userRow(user: User | UserSuggestion, me: User): string {
     return `
       <div class="user-row">
         <button class="user-row-main" data-action="profile" data-username="${escapeHtml(user.username)}">
           ${avatar(user, 'sm')}
           <span class="user-row-text">
             <strong>${escapeHtml(displayName(user.username))}</strong>
-            <span>@${escapeHtml(user.username)} · ${formatCount(user.follower_count)} follower</span>
+            <span>@${escapeHtml(user.username)} · ${formatCount(user.follower_count || 0)} follower</span>
           </span>
         </button>
-        ${this.followButton(user.id, Boolean(user.is_following), user.id === me.id, true)}
+        ${this.followButton(user.id, Boolean((user as any).is_following), user.id === me.id, true)}
       </div>
     `;
   }
 
-  private userCard(user: UserSuggestion, me: User): string {
+  private userCard(user: User | UserSuggestion, me: User): string {
     return `
       <article class="user-card">
         <button class="user-card-avatar" data-action="profile" data-username="${escapeHtml(user.username)}" aria-label="Profilo di @${escapeHtml(user.username)}">
@@ -814,8 +828,8 @@ export class App {
         </div>
         <p class="user-card-bio">${escapeHtml(user.bio || 'Nessuna bio, per ora.')}</p>
         <div class="user-card-footer">
-          <span class="user-card-followers">${icon('users', 13)} ${formatCount(user.follower_count)}</span>
-          ${this.followButton(user.id, Boolean(user.is_following), user.id === me.id)}
+          <span class="user-card-followers">${icon('users', 13)} ${formatCount(user.follower_count || 0)}</span>
+          ${this.followButton(user.id, Boolean((user as any).is_following), user.id === me.id)}
         </div>
       </article>
     `;
@@ -855,78 +869,37 @@ export class App {
   }
 
   private accountModal(me: User): string {
-    const users = repo.listUsers();
-
     return this.modalShell(
-      'Modalità demo',
-      'Cambia account',
+      'Il tuo account',
+      'Gestione profilo',
       `
-        <p class="modal-copy">Nebula non ha login. Scegli un utente demo e interagisci con il database come se fossi lui: like, commenti e follow cambieranno davvero le tabelle.</p>
-        <div class="account-list">
-          ${users
-            .map(
-              (user) => `
-                <button class="account-row ${user.id === me.id ? 'is-active' : ''}" data-action="switch-user" data-user="${user.id}">
-                  ${avatar(user, 'md')}
-                  <span class="account-info">
-                    <strong>${escapeHtml(displayName(user.username))} <span class="handle">@${escapeHtml(user.username)}</span></strong>
-                    <span>${escapeHtml(user.bio)}</span>
-                  </span>
-                  ${user.id === me.id ? `<span class="pill pill-accent">${icon('check', 12)} attivo</span>` : `<span class="pill">usa</span>`}
-                </button>
-              `,
-            )
-            .join('')}
+        <p class="modal-copy">Sei connesso come ${escapeHtml(displayName(me.username))}. Puoi modificare il tuo profilo o uscire dall'account.</p>
+        
+        <div class="account-info">
+          ${avatar(me, 'lg')}
+          <div>
+            <strong>${escapeHtml(displayName(me.username))}</strong>
+            <span class="handle">@${escapeHtml(me.username)}</span>
+            <p>${escapeHtml(me.bio || 'Nessuna bio, per ora.')}</p>
+          </div>
         </div>
-        <p class="modal-footnote">${icon('database', 14)} Gli account sono righe della tabella <code>USER</code>.</p>
+
+        <div class="account-actions">
+          <button class="btn btn-primary btn-sm" data-action="edit-profile">${icon('edit', 15)} Modifica profilo</button>
+          <button class="btn btn-danger btn-sm" id="logout-btn">${icon('logout', 15)} Esci</button>
+        </div>
+
+        <p class="modal-footnote">${icon('shield', 14)} I tuoi dati sono protetti da autenticazione JWT su Neon.</p>
       `,
       'account-modal',
     );
   }
 
-  private dbModal(): string {
-    const stats = repo.getStats();
 
-    return this.modalShell(
-      'Dietro le quinte',
-      'Il database, in chiaro',
-      `
-        <div class="db-hero">
-          <span class="db-hero-icon">${icon('database', 24)}</span>
-          <div>
-            <strong>SQLite · WebAssembly</strong>
-            <span>Persistito in IndexedDB</span>
-          </div>
-          <span class="status-pill"><span class="live-dot"></span> live</span>
-        </div>
 
-        <p class="modal-copy">SQL.js fa girare SQLite dentro la pagina. Dopo ogni scrittura esportiamo il file <code>.sqlite</code> e lo salviamo in IndexedDB: chiudi e riapri, i dati sono ancora qui.</p>
 
-        <div class="db-stats">
-          <div><strong>${stats.users}</strong><span>utenti</span></div>
-          <div><strong>${stats.posts}</strong><span>post</span></div>
-          <div><strong>${stats.comments}</strong><span>commenti</span></div>
-          <div><strong>${stats.likes}</strong><span>like</span></div>
-          <div><strong>${stats.follows}</strong><span>follow</span></div>
-        </div>
 
-        <details class="schema">
-          <summary>${icon('code', 15)} Schema SQL <span class="schema-chevron">${icon('chevronDown', 15)}</span></summary>
-          <pre>${escapeHtml(SCHEMA_SQL.trim())}</pre>
-        </details>
 
-        <div class="db-actions">
-          <button class="btn btn-ghost btn-sm" data-action="download-db">${icon('download', 15)} Scarica .sqlite</button>
-          <button class="btn btn-danger btn-sm ${this.state.resetArmed ? 'is-armed' : ''}" data-action="reset-db">
-            ${icon('refresh', 15)} ${this.state.resetArmed ? 'Confermi il reset?' : 'Ripristina demo'}
-          </button>
-        </div>
-        ${this.state.resetArmed ? `<p class="reset-hint">Clicca di nuovo per cancellare il database locale e ricaricare i dati demo.</p>` : ''}
-        <p class="modal-footnote">${icon('wifiOff', 14)} Dopo la prima visita la PWA funziona anche offline.</p>
-      `,
-      'db-modal',
-    );
-  }
 
   private profileEditModal(me: User): string {
     const bio = this.state.drafts.get('profile-bio') ?? me.bio;
@@ -956,7 +929,7 @@ export class App {
     );
   }
 
-  private handleClick(event: MouseEvent): void {
+  private async handleClick(event: MouseEvent): Promise<void> {
     const target = event.target instanceof Element
       ? event.target.closest<HTMLElement>('[data-action]')
       : null;
@@ -993,8 +966,15 @@ export class App {
       case 'like': {
         const postId = Number(target.dataset.post);
         if (!Number.isFinite(postId)) return;
-        repo.toggleLike(this.me.id, postId);
-        this.render();
+        try {
+          await apiClient.toggleLike(postId);
+          // Ricarica lo snapshot per avere i dati aggiornati
+          const snapshot = await apiClient.loadSnapshot();
+          this.state.snapshot = snapshot;
+          this.render();
+        } catch (error) {
+          this.notify(error instanceof Error ? error.message : 'Azione non riuscita', 'error');
+        }
         break;
       }
 
@@ -1015,17 +995,23 @@ export class App {
 
       case 'follow': {
         const userId = Number(target.dataset.user);
-        if (!Number.isFinite(userId) || userId === this.me.id) return;
+        if (!Number.isFinite(userId) || userId === this.refreshMe().id) return;
 
-        const following = repo.toggleFollow(this.me.id, userId);
-        const username = repo.getUser(userId)?.username;
-        this.render();
+        try {
+          const snapshot = await apiClient.toggleFollow(userId);
+          this.state.snapshot = snapshot;
+          this.render();
 
-        if (username) {
-          this.notify(
-            following ? `Ora segui @${username}` : `Non segui più @${username}`,
-            following ? 'success' : 'info',
-          );
+          const user = this.state.snapshot.users.find(u => u.id === userId);
+          if (user) {
+            const isFollowing = this.state.snapshot.follows.some(f => f.follower_id === this.refreshMe().id && f.followee_id === userId);
+            this.notify(
+              isFollowing ? `Ora segui @${user.username}` : `Non segui più @${user.username}`,
+              isFollowing ? 'success' : 'info',
+            );
+          }
+        } catch (error) {
+          this.notify(error instanceof Error ? error.message : 'Azione non riuscita', 'error');
         }
         break;
       }
@@ -1047,23 +1033,52 @@ export class App {
         break;
       }
 
+      case 'upload-media': {
+        const input = target as HTMLInputElement;
+        const file = input.files?.[0];
+        if (file) {
+          try {
+            const url = await apiClient.uploadFile(file);
+            // Aggiungi l'URL al composer
+            const textarea = this.root.querySelector<HTMLTextAreaElement>('[data-draft="composer"]');
+            if (textarea) {
+              const currentContent = textarea.value;
+              textarea.value = currentContent + `\n\n![${file.name}](${url})`;
+              this.updateComposerState();
+            }
+            this.notify('File caricato con successo');
+          } catch (error) {
+            this.notify(error instanceof Error ? error.message : 'Upload fallito', 'error');
+          }
+        }
+        break;
+      }
+
       case 'toggle-account': {
         this.state.accountOpen = !this.state.accountOpen;
-        this.state.dbOpen = false;
         this.state.editProfileOpen = false;
+        this.state.neonInfoOpen = false;
         this.render();
         break;
       }
 
       case 'switch-user':
-        this.switchUser(Number(target.dataset.user));
+        // Con Neon Auth, non possiamo più switchare tra account demo
+        this.notify('Con Neon Auth, ogni account ha le proprie credenziali', 'info');
+        break;
+
+      case 'logout':
+        void this.logout();
+        break;
+
+      case 'refresh-data':
+        void this.refreshData();
         break;
 
       case 'open-db':
-        this.state.dbOpen = true;
+        this.state.neonInfoOpen = true;
         this.state.accountOpen = false;
         this.state.editProfileOpen = false;
-        this.state.resetArmed = false;
         this.render();
         break;
 
@@ -1071,12 +1086,19 @@ export class App {
         this.closeModals();
         break;
 
+      case 'show-neon-info':
+        this.state.neonInfoOpen = true;
+        this.state.accountOpen = false;
+        this.state.editProfileOpen = false;
+        this.render();
+        break;
+
       case 'reset-db':
-        void this.resetDemoDatabase();
+        this.notify('Il database è gestito da Neon, non può essere resettato localmente', 'info');
         break;
 
       case 'download-db':
-        this.downloadDatabase();
+        this.notify('Il database è su Neon, non può essere scaricato localmente', 'info');
         break;
 
       case 'edit-profile':
@@ -1084,7 +1106,7 @@ export class App {
         this.state.drafts.delete('profile-avatar');
         this.state.editProfileOpen = true;
         this.state.accountOpen = false;
-        this.state.dbOpen = false;
+        this.state.neonInfoOpen = false;
         this.render();
         break;
 
@@ -1128,40 +1150,59 @@ export class App {
   private async submitPost(form: HTMLFormElement): Promise<void> {
     const data = new FormData(form);
     const content = String(data.get('content') ?? '');
-    const mediaRaw = String(data.get('media') ?? '');
+    const fileInput = form.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = fileInput?.files?.[0];
 
     if (!content.trim()) return;
 
-    let mediaUrl: string | null = null;
-    if (mediaRaw.trim()) {
-      mediaUrl = normalizeImageUrl(mediaRaw);
-      if (!mediaUrl) {
-        this.notify('URL immagine non valido. Usa https://… oppure media/mesh.svg', 'error');
-        return;
-      }
-    }
-
     try {
-      repo.createPost(this.refreshMe().id, content, mediaUrl);
+      let mediaUrl: string | null = null;
+      
+      // Se c'è un file, caricalo sull'object storage
+      if (file) {
+        mediaUrl = await apiClient.uploadFile(file);
+      } else if (data.has('media')) {
+        const mediaRaw = String(data.get('media') ?? '');
+        if (mediaRaw.trim()) {
+          mediaUrl = normalizeImageUrl(mediaRaw);
+          if (!mediaUrl) {
+            this.notify('URL immagine non valido. Usa https://… oppure media/mesh.svg', 'error');
+            return;
+          }
+        }
+      }
+
+      // Crea il post tramite API
+      await apiClient.createPost(content, mediaUrl);
+      
+      // Ricarica lo snapshot per avere i dati aggiornati
+      const snapshot = await apiClient.loadSnapshot();
+      this.state.snapshot = snapshot;
+      
       this.state.drafts.delete('composer');
       this.state.drafts.delete('media');
       this.state.mediaOpen = false;
       this.render();
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      this.notify('Post pubblicato nel database');
+      this.notify('Post pubblicato su Neon');
     } catch (error) {
       this.notify(error instanceof Error ? error.message : 'Pubblicazione non riuscita', 'error');
     }
   }
 
-  private submitComment(form: HTMLFormElement): void {
+  private async submitComment(form: HTMLFormElement): Promise<void> {
     const postId = Number(form.dataset.post);
     const content = String(new FormData(form).get('content') ?? '');
 
     if (!Number.isFinite(postId) || !content.trim()) return;
 
     try {
-      repo.addComment(postId, this.refreshMe().id, content);
+      await apiClient.addComment(postId, content);
+      
+      // Ricarica lo snapshot per avere i dati aggiornati
+      const snapshot = await apiClient.loadSnapshot();
+      this.state.snapshot = snapshot;
+      
       this.state.drafts.delete(`comment:${postId}`);
       this.state.commentsOpen.add(postId);
       this.render();
@@ -1175,7 +1216,7 @@ export class App {
     }
   }
 
-  private submitProfile(form: HTMLFormElement): void {
+  private async submitProfile(form: HTMLFormElement): Promise<void> {
     const data = new FormData(form);
     const bio = String(data.get('bio') ?? '');
     const avatarRaw = String(data.get('avatar') ?? '');
@@ -1190,12 +1231,21 @@ export class App {
       avatarUrl = normalized;
     }
 
-    repo.updateProfile(this.refreshMe().id, bio, avatarUrl);
-    this.state.drafts.delete('profile-bio');
-    this.state.drafts.delete('profile-avatar');
-    this.state.editProfileOpen = false;
-    this.render();
-    this.notify('Profilo aggiornato');
+    try {
+      await apiClient.updateProfile(bio, avatarUrl);
+      
+      // Ricarica lo snapshot per avere i dati aggiornati
+      const snapshot = await apiClient.loadSnapshot();
+      this.state.snapshot = snapshot;
+      
+      this.state.drafts.delete('profile-bio');
+      this.state.drafts.delete('profile-avatar');
+      this.state.editProfileOpen = false;
+      this.render();
+      this.notify('Profilo aggiornato su Neon');
+    } catch (error) {
+      this.notify(error instanceof Error ? error.message : 'Aggiornamento profilo non riuscito', 'error');
+    }
   }
 
   private handleInput(event: Event): void {
@@ -1249,7 +1299,7 @@ export class App {
 
   private handleKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
-      if (this.state.accountOpen || this.state.dbOpen || this.state.editProfileOpen) {
+      if (this.state.accountOpen || this.state.neonInfoOpen || this.state.editProfileOpen) {
         this.closeModals();
       }
       return;
@@ -1268,9 +1318,8 @@ export class App {
     this.state.profileUsername =
       view === 'profile' ? (username ?? this.refreshMe().username) : null;
     this.state.accountOpen = false;
-    this.state.dbOpen = false;
     this.state.editProfileOpen = false;
-    this.state.resetArmed = false;
+    this.state.neonInfoOpen = false;
     this.render();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -1291,41 +1340,19 @@ export class App {
     });
   }
 
-  private switchUser(userId: number): void {
-    const user = repo.getUser(userId);
-    if (!user) return;
 
-    this.state.meId = user.id;
-    this.state.view = 'home';
-    this.state.profileUsername = null;
-    this.state.feedTab = 'all';
-    this.state.commentsOpen.clear();
-    this.state.drafts.clear();
-    this.state.mediaOpen = false;
-    this.state.search = '';
-    this.state.accountOpen = false;
-    this.state.dbOpen = false;
-    this.state.editProfileOpen = false;
-    this.state.resetArmed = false;
-
-    localStorage.setItem(ME_STORAGE_KEY, String(user.id));
-    this.render();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    this.notify(`Ora sei @${user.username}. Prova a mettere un like.`);
-  }
 
   private closeModals(): void {
     this.state.accountOpen = false;
-    this.state.dbOpen = false;
     this.state.editProfileOpen = false;
-    this.state.resetArmed = false;
+    this.state.neonInfoOpen = false;
     this.render();
   }
 
   private async sharePost(postId: number): Promise<void> {
     if (!Number.isFinite(postId)) return;
 
-    const post = repo.getPost(postId, this.me.id);
+    const post = this.state.snapshot.posts.find(p => p.id === postId);
     if (!post) return;
 
     const text = `“${post.content}”\n\n— @${post.username} su Nebula`;
@@ -1343,53 +1370,47 @@ export class App {
     }
   }
 
-  private deletePost(postId: number): void {
+  private async deletePost(postId: number): Promise<void> {
     if (!Number.isFinite(postId)) return;
 
     const confirmed = window.confirm(
-      'Eliminare questo post? Like e commenti collegati verranno rimossi (ON DELETE CASCADE).',
+      'Eliminare questo post? Like e commenti collegati verranno rimossi.',
     );
     if (!confirmed) return;
 
-    if (repo.deletePost(postId, this.me.id)) {
+    try {
+      await apiClient.deletePost(postId);
+      // Ricarica lo snapshot per avere i dati aggiornati
+      const snapshot = await apiClient.loadSnapshot();
+      this.state.snapshot = snapshot;
       this.state.commentsOpen.delete(postId);
       this.render();
-      this.notify('Post eliminato dal database', 'info');
-    } else {
-      this.notify('Non puoi eliminare questo post', 'error');
+      this.notify('Post eliminato da Neon', 'info');
+    } catch (error) {
+      this.notify(error instanceof Error ? error.message : 'Eliminazione non riuscita', 'error');
     }
   }
 
-  private async resetDemoDatabase(): Promise<void> {
-    if (!this.state.resetArmed) {
-      this.state.resetArmed = true;
-      this.render();
-      return;
-    }
-
+  private async refreshData(): Promise<void> {
     try {
-      await database.resetDatabase();
+      const snapshot = await apiClient.loadSnapshot();
+      this.state.snapshot = snapshot;
+      this.render();
+      this.notify('Dati aggiornati da Neon', 'success');
+    } catch (error) {
+      this.notify(error instanceof Error ? error.message : 'Aggiornamento fallito', 'error');
+    }
+  }
+
+  private async logout(): Promise<void> {
+    try {
+      await apiClient.signOut();
+      localStorage.removeItem('nebula:me');
       window.location.reload();
     } catch (error) {
-      console.error(error);
-      this.notify('Reset non riuscito. Riprova.', 'error');
-    }
-  }
-
-  private downloadDatabase(): void {
-    try {
-      const bytes = database.exportBytes();
-      const blob = new Blob([bytes as BlobPart], { type: 'application/x-sqlite3' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = 'nebula.sqlite';
-      anchor.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
-      this.notify('File SQLite scaricato');
-    } catch (error) {
-      console.error(error);
-      this.notify('Download non riuscito', 'error');
+      console.error('Logout fallito:', error);
+      localStorage.removeItem('nebula:me');
+      window.location.reload();
     }
   }
 
@@ -1401,9 +1422,52 @@ export class App {
     } else if (outcome === 'dismissed') {
       this.notify('Installazione annullata', 'info');
     } else {
-      this.notify('Apri il menu del browser e scegli “Installa app”.', 'info');
+      this.notify('Apri il menu del browser e scegli "Installa app".', 'info');
     }
 
     this.render();
+  }
+
+  private neonInfoModal(): string {
+    const stats = this.state.snapshot.stats;
+
+    return this.modalShell(
+      'Informazioni su Neon',
+      'Database e archiviazione',
+      `
+        <div class="db-hero">
+          <span class="db-hero-icon">${icon('database', 24)}</span>
+          <div>
+            <strong>PostgreSQL su Neon</strong>
+            <span>Database relazionale con autenticazione</span>
+          </div>
+          <span class="status-pill"><span class="live-dot"></span> live</span>
+        </div>
+
+        <p class="modal-copy">Nebula utilizza Neon come backend PostgreSQL. I dati sono persistenti e sincronizzati in tempo reale. Le immagini e i video sono archiviati su Neon Object Storage.</p>
+
+        <div class="db-stats">
+          <div><strong>${stats.users}</strong><span>utenti</span></div>
+          <div><strong>${stats.posts}</strong><span>post</span></div>
+          <div><strong>${stats.comments}</strong><span>commenti</span></div>
+          <div><strong>${stats.likes}</strong><span>like</span></div>
+          <div><strong>${stats.follows}</strong><span>follow</span></div>
+        </div>
+
+        <div class="neon-features">
+          <h4>Funzionalità Neon:</h4>
+          <ul>
+            <li>✅ Autenticazione JWT sicura</li>
+            <li>✅ Database PostgreSQL relazionale</li>
+            <li>✅ Archiviazione file (Object Storage)</li>
+            <li>✅ Query in tempo reale</li>
+            <li>✅ Backup automatici</li>
+          </ul>
+        </div>
+
+        <p class="modal-footnote">${icon('wifiOff', 14)} Dopo la prima visita la PWA funziona anche offline.</p>
+      `,
+      'neon-modal',
+    );
   }
 }
