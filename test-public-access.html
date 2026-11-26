@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Accesso Pubblico Nebula</title>
+    <style>
+        body {
+            font-family: var(--font-body);
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg);
+            color: var(--text);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .test-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .test-title {
+            font-family: var(--font-display);
+            margin: 0 0 15px 0;
+            color: var(--text);
+        }
+        
+        .test-description {
+            color: var(--muted);
+            margin-bottom: 15px;
+        }
+        
+        .btn {
+            background: var(--gradient);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-weight: 600;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+        
+        .btn-ghost {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-ghost:hover {
+            background: var(--surface-2);
+        }
+        
+        .result {
+            background: var(--surface-solid);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 15px;
+            margin-top: 15px;
+            display: none;
+        }
+        
+        .result.success {
+            border-color: var(--green);
+        }
+        
+        .result.error {
+            border-color: var(--pink);
+        }
+        
+        .post {
+            background: var(--surface-solid);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .post-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .post-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+            background: var(--surface-2);
+        }
+        
+        .post-meta {
+            flex: 1;
+        }
+        
+        .post-username {
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .post-time {
+            font-size: 0.8em;
+            color: var(--muted);
+        }
+        
+        .post-content {
+            margin-bottom: 10px;
+        }
+        
+        .post-actions {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .post-action {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--muted);
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        
+        .post-action:hover {
+            color: var(--text);
+        }
+        
+        .post-action.liked {
+            color: var(--pink);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Nebula - Test Accesso Pubblico</h1>
+        <p>Questa pagina testa le funzionalità disponibili per utenti non autenticati.</p>
+        
+        <div class="test-section">
+            <h2 class="test-title">Test 1: Visualizzazione Post Pubblici</h2>
+            <p class="test-description">Verifica che gli utenti non autenticati possano vedere i post.</p>
+            <button class="btn" onclick="testGetPublicPosts()">Carica Post Pubblici</button>
+            <div id="posts-result" class="result"></div>
+            <div id="posts-list"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2 class="test-title">Test 2: Visualizzazione Profili</h2>
+            <p class="test-description">Verifica che gli utenti non autenticati possano vedere i profili.</p>
+            <button class="btn" onclick="testGetUsers()">Carica Utenti</button>
+            <div id="users-result" class="result"></div>
+            <div id="users-list"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2 class="test-title">Test 3: Visualizzazione Commenti</h2>
+            <p class="test-description">Verifica che gli utenti non autenticati possano vedere i commenti.</p>
+            <button class="btn" onclick="testGetComments()">Carica Commenti</button>
+            <div id="comments-result" class="result"></div>
+            <div id="comments-list"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2 class="test-title">Test 4: Funzionalità Richiedono Autenticazione</h2>
+            <p class="test-description">Verifica che le funzionalità riservate agli utenti autenticati rechiedano login.</p>
+            <button class="btn btn-ghost" onclick="testCreatePost()">Crea Post (dovrebbe fallire)</button>
+            <button class="btn btn-ghost" onclick="testAddComment()">Aggiungi Commento (dovrebbe fallire)</button>
+            <button class="btn btn-ghost" onclick="testToggleFollow()">Segui Utente (dovrebbe fallire)</button>
+            <div id="auth-result" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2 class="test-title">Test 5: Accesso con Account</h2>
+            <p class="test-description">Testa il login e le funzionalità riservate.</p>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <input type="text" id="login-email" placeholder="Email o username" value="test@example.com">
+                <input type="password" id="login-password" placeholder="Password" value="password">
+                <button class="btn" onclick="testLogin()">Login</button>
+            </div>
+            <button class="btn" onclick="testCreatePostAuth()">Crea Post (dopo login)</button>
+            <button class="btn" onclick="testAddCommentAuth()">Aggiungi Commento (dopo login)</button>
+            <button class="btn" onclick="testToggleFollowAuth()">Segui Utente (dopo login)</button>
+            <div id="login-result" class="result"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { apiClient } from './src/api/client.js';
+        
+        // Test 1: Visualizzazione Post Pubblici
+        window.testGetPublicPosts = async function() {
+            try {
+                const posts = await apiClient.getPublicPosts();
+                const resultDiv = document.getElementById('posts-result');
+                const postsList = document.getElementById('posts-list');
+                
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `<strong>✅ Successo!</strong> Caricati ${posts.length} post.`;
+                resultDiv.style.display = 'block';
+                
+                postsList.innerHTML = posts.map(post => `
+                    <div class="post">
+                        <div class="post-header">
+                            <div class="post-avatar"></div>
+                            <div class="post-meta">
+                                <div class="post-username">${post.username}</div>
+                                <div class="post-time">${new Date(post.created_at).toLocaleString()}</div>
+                            </div>
+                        </div>
+                        <div class="post-content">${post.content}</div>
+                        <div class="post-actions">
+                            <div class="post-action">
+                                <span>❤️</span>
+                                <span>${post.like_count}</span>
+                            </div>
+                            <div class="post-action">
+                                <span>💬</span>
+                                <span>${post.comment_count}</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                const resultDiv = document.getElementById('posts-result');
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<strong>❌ Errore:</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        };
+        
+        // Test 2: Visualizzazione Utenti
+        window.testGetUsers = async function() {
+            try {
+                const users = await apiClient.getAllUsers();
+                const resultDiv = document.getElementById('users-result');
+                const usersList = document.getElementById('users-list');
+                
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `<strong>✅ Successo!</strong> Caricati ${users.length} utenti.`;
+                resultDiv.style.display = 'block';
+                
+                usersList.innerHTML = users.map(user => `
+                    <div class="post">
+                        <div class="post-header">
+                            <div class="post-avatar"></div>
+                            <div class="post-meta">
+                                <div class="post-username">${user.username}</div>
+                                <div class="post-time">${user.email}</div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                const resultDiv = document.getElementById('users-result');
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<strong>❌ Errore:</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        };
+        
+        // Test 3: Visualizzazione Commenti
+        window.testGetComments = async function() {
+            try {
+                // Per il test, cerchiamo commenti del primo post
+                const posts = await apiClient.getPublicPosts();
+                if (posts.length === 0) {
+                    throw new Error('Nessun post disponibile per testare i commenti');
+                }
+                
+                const postId = posts[0].id;
+                const comments = await apiClient.getComments(postId);
+                const resultDiv = document.getElementById('comments-result');
+                const commentsList = document.getElementById('comments-list');
+                
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `<strong>✅ Successo!</strong> Caricati ${comments.length} commenti per il post ${postId}.`;
+                resultDiv.style.display = 'block';
+                
+                commentsList.innerHTML = comments.map(comment => `
+                    <div class="post">
+                        <div class="post-header">
+                            <div class="post-avatar"></div>
+                            <div class="post-meta">
+                                <div class="post-username">${comment.username}</div>
+                                <div class="post-time">${new Date(comment.created_at).toLocaleString()}</div>
+                            </div>
+                        </div>
+                        <div class="post-content">${comment.content}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                const resultDiv = document.getElementById('comments-result');
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<strong>❌ Errore:</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        };
+        
+        // Test 4: Funzionalità che richiedono autenticazione (senza login)
+        window.testCreatePost = async function() {
+            try {
+                await apiClient.createPost('Questo post non dovrebbe essere creato');
+                const resultDiv = document.getElementById('auth-result');
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = '<strong>❌ Errore:</strong> Il post è stato creato senza autenticazione!';
+                resultDiv.style.display = 'block';
+            } catch (error) {
+                const resultDiv = document.getElementById('auth-result');
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `<strong>✅ Successo!</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        };
+        
+        window.testAddComment = async function() {
+            try {
+                await apiClient.addComment(1, 'Questo commento non dovrebbe essere aggiunto');
+                const resultDiv = document.getElementById('auth-result');
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = '<strong>❌ Errore:</strong> Il commento è stato aggiunto senza autenticazione!';
+                resultDiv.style.display = 'block';
+            } catch (error) {
+                const resultDiv = document.getElementById('auth-result');
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `<strong>✅ Successo!</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        };
+        
+        window.testToggleFollow = async function() {
+            try {
+                await apiClient.toggleFollow(1);
+                const resultDiv = document.getElementById('auth-result');
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = '<strong>❌ Errore:</strong> Il follow è stato aggiunto senza autenticazione!';
+                resultDiv.style.display = 'block';
+            } catch (error) {
+                const resultDiv = document.getElementById('auth-result');
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `<strong>✅ Successo!</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        };
+        
+        // Test 5: Accesso con account
+        window.testLogin = async function() {
+            try {
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+                
+                const result = await apiClient.signIn(email, password);
+                const resultDiv = document.getElementById('login-result');
+                
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `<strong>✅ Login riuscito!</strong> Benvenuto ${email}`;
+                resultDiv.style.display = 'block';
+            } catch (error) {
+                const resultDiv = document.getElementById('login-result');
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<strong>❌ Login fallito:</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        };
+        
+        window.testCreatePostAuth = async function() {
+            try {
+                const result = await apiClient.createPost('Questo post è stato creato dopo il login');
+                const resultDiv = document.getElementById('login-result');
+                
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML += `<br><strong>✅ Post creato!</strong> ID: ${result.id}`;
+                resultDiv.style.display = 'block';
+            } catch (error) {
+                const resultDiv = document.getElementById('login-result');
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML += `<br><strong>❌ Errore creazione post:</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        };
+        
+        window.testAddCommentAuth = async function() {
+            try {
+                // Cerchiamo un post per commentare
+                const posts = await apiClient.getPublicPosts();
+                if (posts.length === 0) {
+                    throw new Error('Nessun post disponibile per commentare');
+                }
+                
+                const postId = posts[0].id;
+                const result = await apiClient.addComment(postId, 'Questo commento è stato aggiunto dopo il login');
+                const resultDiv = document.getElementById('login-result');
+                
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML += `<br><strong>✅ Commento aggiunto!</strong> ID: ${result.id}`;
+                resultDiv.style.display = 'block';
+            } catch (error) {
+                const resultDiv = document.getElementById('login-result');
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML += `<br><strong>❌ Errore aggiunta commento:</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        };
+        
+        window.testToggleFollowAuth = async function() {
+            try {
+                // Cerchiamo un utente da seguire
+                const users = await apiClient.getAllUsers();
+                if (users.length <= 1) {
+                    throw new Error('Nessun altro utente disponibile per seguire');
+                }
+                
+                const userId = users[1].id; // Segui il secondo utente
+                const result = await apiClient.toggleFollow(userId);
+                const resultDiv = document.getElementById('login-result');
+                
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML += `<br><strong>✅ Follow ${result.following ? 'aggiunto' : 'rimosso'}!</strong>`;
+                resultDiv.style.display = 'block';
+            } catch (error) {
+                const resultDiv = document.getElementById('login-result');
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML += `<br><strong>❌ Errore follow:</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        };
+    </script>
+</body>
+</html>

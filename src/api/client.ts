@@ -75,12 +75,12 @@ export interface DbStats {
   }>;
 }
 
-// Client API con autenticazione JWT
+// Client API con supporto per utenti autenticati e non
 export class NeonApiClient {
   private token: string | null = null;
 
-  // Ottieni il JWT token per le richieste API
-  private async getAuthToken(): Promise<string> {
+  // Ottieni il JWT token per le richieste API (se disponibile)
+  private async getAuthToken(): Promise<string | null> {
     // Se abbiamo già un token, lo restituiamo
     if (this.token) {
       return this.token;
@@ -93,8 +93,8 @@ export class NeonApiClient {
       return this.token;
     }
 
-    // Se non abbiamo un token, lanciamo un errore
-    throw new Error('Authentication required');
+    // Se non abbiamo un token, restituiamo null (utente non autenticato)
+    return null;
   }
 
   // Imposta il token JWT (dopo il login)
@@ -109,7 +109,7 @@ export class NeonApiClient {
     localStorage.removeItem('nebula:token');
   }
 
-  // Carica lo snapshot iniziale
+  // Carica lo snapshot iniziale (funziona anche per utenti non autenticati)
   async loadSnapshot(): Promise<Snapshot> {
     // For deployed version, we'll use mock data
     // In production, you would use the real backend
@@ -117,17 +117,22 @@ export class NeonApiClient {
       const mockUser = localStorage.getItem('nebula:me');
       const user = mockUser ? JSON.parse(mockUser) : null;
       
+      // Carica dati da localStorage per utenti non autenticati
+      const posts = JSON.parse(localStorage.getItem('nebula:posts') || '[]');
+      const comments = JSON.parse(localStorage.getItem('nebula:comments') || '[]');
+      const users = JSON.parse(localStorage.getItem('nebula:users') || '[]');
+      
       const mockSnapshot: Snapshot = {
         me: user,
-        users: user ? [user] : [],
-        posts: [],
-        comments: [],
+        users: users,
+        posts: posts,
+        comments: comments,
         follows: [],
         stats: {
-          users: 1,
-          posts: 0,
-          comments: 0,
-          likes: 0,
+          users: users.length,
+          posts: posts.length,
+          comments: comments.length,
+          likes: posts.reduce((sum: number, post: any) => sum + post.like_count, 0),
           follows: 0
         },
         revision: '1',
@@ -144,7 +149,7 @@ export class NeonApiClient {
     const token = await this.getAuthToken();
     const response = await fetch(`${API_BASE_URL}/bootstrap`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': token ? `Bearer ${token}` : '',
         'Content-Type': 'application/json',
       },
     });
@@ -168,6 +173,10 @@ export class NeonApiClient {
       
       // For local development, use the real backend
       const token = await this.getAuthToken();
+      if (!token) {
+        return { user: null, authenticated: false };
+      }
+      
       const response = await fetch(`${API_BASE_URL}/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -287,15 +296,21 @@ export class NeonApiClient {
     return { success: true };
   }
 
-  // Crea un nuovo post
+  // Crea un nuovo post (solo per utenti autenticati)
   async createPost(content: string, mediaUrl?: string | null) {
+    // Check if user is authenticated
+    const isDeployed = window.location.hostname === 'slash-as.github.io';
+    const isAuthenticated = isDeployed ? 
+      !!localStorage.getItem('nebula:me') : 
+      !!(await this.getAuthToken());
+    
+    if (!isAuthenticated) {
+      throw new Error('Authentication required to create posts');
+    }
+    
     // For deployed version, we'll simulate creating a post
-    if (window.location.hostname === 'slash-as.github.io') {
+    if (isDeployed) {
       const mockUser = JSON.parse(localStorage.getItem('nebula:me') || '{}');
-      
-      if (!mockUser.id) {
-        throw new Error('Authentication required');
-      }
       
       const mockPost = {
         id: Date.now(),
@@ -392,15 +407,39 @@ export class NeonApiClient {
     return response.json();
   }
 
-  // Aggiungi un commento a un post
-  async addComment(postId: number, content: string) {
-    // For deployed version, we'll simulate adding a comment
+  // Ottieni tutti i post pubblicamente disponibili
+  async getPublicPosts() {
+    // For deployed version, we'll return posts from localStorage
     if (window.location.hostname === 'slash-as.github.io') {
+      const posts = JSON.parse(localStorage.getItem('nebula:posts') || '[]');
+      return posts;
+    }
+    
+    // For local development, use the real backend without authentication
+    const response = await fetch(`${API_BASE_URL}/posts`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch posts: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  // Aggiungi un commento a un post (solo per utenti autenticati)
+  async addComment(postId: number, content: string) {
+    // Check if user is authenticated
+    const isDeployed = window.location.hostname === 'slash-as.github.io';
+    const isAuthenticated = isDeployed ? 
+      !!localStorage.getItem('nebula:me') : 
+      !!(await this.getAuthToken());
+    
+    if (!isAuthenticated) {
+      throw new Error('Authentication required to add comments');
+    }
+    
+    // For deployed version, we'll simulate adding a comment
+    if (isDeployed) {
       const mockUser = JSON.parse(localStorage.getItem('nebula:me') || '{}');
-      
-      if (!mockUser.id) {
-        throw new Error('Authentication required');
-      }
       
       const comments = JSON.parse(localStorage.getItem('nebula:comments') || '[]');
       const newComment = {
@@ -445,22 +484,51 @@ export class NeonApiClient {
     return response.json();
   }
 
-  // Segui/unfollow un utente
-  async toggleFollow(userId: number) {
-    // For deployed version, we'll simulate toggling a follow
+  // Ottieni i commenti di un post (funziona anche per utenti non autenticati)
+  async getComments(postId: number) {
+    // For deployed version, we'll return comments from localStorage
     if (window.location.hostname === 'slash-as.github.io') {
+      const comments = JSON.parse(localStorage.getItem('nebula:comments') || '[]');
+      return comments.filter((c: any) => c.post_id === postId);
+    }
+    
+    // For local development, use the real backend without authentication
+    const response = await fetch(`${API_BASE_URL}/posts/${postId}/comments`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch comments: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  // Segui/unfollow un utente (solo per utenti autenticati)
+  async toggleFollow(userId: number) {
+    // Check if user is authenticated
+    const isDeployed = window.location.hostname === 'slash-as.github.io';
+    const isAuthenticated = isDeployed ? 
+      !!localStorage.getItem('nebula:me') : 
+      !!(await this.getAuthToken());
+    
+    if (!isAuthenticated) {
+      throw new Error('Authentication required to follow users');
+    }
+    
+    // For deployed version, we'll simulate toggling a follow
+    if (isDeployed) {
+      const mockUser = JSON.parse(localStorage.getItem('nebula:me') || '{}');
       const follows = JSON.parse(localStorage.getItem('nebula:follows') || '[]');
-      const existingFollow = follows.find((f: any) => f.follower_id === 1 && f.followee_id === userId);
+      const existingFollow = follows.find((f: any) => f.follower_id === mockUser.id && f.followee_id === userId);
       
       if (existingFollow) {
         // Remove follow
-        const updatedFollows = follows.filter((f: any) => !(f.follower_id === 1 && f.followee_id === userId));
+        const updatedFollows = follows.filter((f: any) => !(f.follower_id === mockUser.id && f.followee_id === userId));
         localStorage.setItem('nebula:follows', JSON.stringify(updatedFollows));
         return { success: true, following: false };
       } else {
         // Add follow
         const newFollow = {
-          follower_id: 1,
+          follower_id: mockUser.id,
           followee_id: userId,
           created_at: new Date().toISOString()
         };
@@ -487,6 +555,24 @@ export class NeonApiClient {
     return response.json();
   }
 
+  // Ottieni un profilo utente (funziona anche per utenti non autenticati)
+  async getUserProfile(userId: number) {
+    // For deployed version, we'll return user from localStorage
+    if (window.location.hostname === 'slash-as.github.io') {
+      const users = JSON.parse(localStorage.getItem('nebula:users') || '[]');
+      return users.find((u: any) => u.id === userId);
+    }
+    
+    // For local development, use the real backend without authentication
+    const response = await fetch(`${API_BASE_URL}/users/${userId}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch user profile: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
   // Aggiorna il profilo utente
   async updateProfile(bio: string, avatarUrl: string) {
     const token = await this.getAuthToken();
@@ -501,6 +587,24 @@ export class NeonApiClient {
 
     if (!response.ok) {
       throw new Error(`Failed to update profile: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  // Ottieni tutti gli utenti (funziona anche per utenti non autenticati)
+  async getAllUsers() {
+    // For deployed version, we'll return users from localStorage
+    if (window.location.hostname === 'slash-as.github.io') {
+      const users = JSON.parse(localStorage.getItem('nebula:users') || '[]');
+      return users;
+    }
+    
+    // For local development, use the real backend without authentication
+    const response = await fetch(`${API_BASE_URL}/users`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch users: ${response.status}`);
     }
 
     return response.json();
