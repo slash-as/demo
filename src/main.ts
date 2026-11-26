@@ -228,9 +228,12 @@ function addLogoutButton(): void {
   themeButton.style.marginLeft = '8px';
   
   // Inserisci il pulsante del tema dopo il pulsante di logout
-  if (accountButton.querySelector('.logout-btn')) {
-    const logoutBtn = accountButton.querySelector('.logout-btn');
+  const logoutBtn = accountButton.querySelector('.logout-btn');
+  if (logoutBtn) {
     accountButton.insertBefore(themeButton, logoutBtn.nextSibling);
+  } else {
+    // Se non c'è il pulsante di logout, aggiungi il tema alla fine
+    accountButton.appendChild(themeButton);
   }
 }
 
