@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Tema Nebula</title>
+    <style>
+        body {
+            font-family: var(--font-body);
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg);
+            color: var(--text);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: var(--surface);
+            padding: 20px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-family: var(--font-display);
+            margin: 0;
+        }
+        
+        .theme-toggle {
+            cursor: pointer;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            transition: all 0.2s ease;
+        }
+        
+        .theme-toggle:hover {
+            background: var(--surface);
+            transform: scale(1.05);
+        }
+        
+        .card {
+            background: var(--surface-solid);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .card-title {
+            font-family: var(--font-display);
+            margin: 0 0 10px 0;
+            color: var(--text);
+        }
+        
+        .card-content {
+            color: var(--muted);
+        }
+        
+        .btn {
+            background: var(--gradient);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+        
+        .btn-ghost {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-ghost:hover {
+            background: var(--surface-2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Nebula - Test Tema</h1>
+            <button class="theme-toggle" id="theme-toggle">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="4"/>
+                    <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="card">
+            <h2 class="card-title">Card di Test</h2>
+            <p class="card-content">Questa card mostra come appare il tema chiaro e scuro.</p>
+            <button class="btn">Pulsante Principale</button>
+        </div>
+        
+        <div class="card">
+            <h2 class="card-title">Altra Card</h2>
+            <p class="card-content">Testo secondario con colori diversi.</p>
+            <button class="btn btn-ghost">Pulsante Secondario</button>
+        </div>
+    </div>
+
+    <script>
+        // Theme toggle functionality
+        const themeToggle = document.getElementById('theme-toggle');
+        const html = document.documentElement;
+        
+        // Load saved theme
+        const savedTheme = localStorage.getItem('nebula:theme');
+        if (savedTheme === 'light') {
+            html.setAttribute('data-theme', 'light');
+            updateThemeIcon(true);
+        }
+        
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = html.getAttribute('data-theme');
+            if (currentTheme === 'light') {
+                html.removeAttribute('data-theme');
+                localStorage.setItem('nebula:theme', 'dark');
+                updateThemeIcon(false);
+            } else {
+                html.setAttribute('data-theme', 'light');
+                localStorage.setItem('nebula:theme', 'light');
+                updateThemeIcon(true);
+            }
+        });
+        
+        function updateThemeIcon(isLight) {
+            if (isLight) {
+                themeToggle.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/>
+                    </svg>
+                `;
+            } else {
+                themeToggle.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="4"/>
+                        <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                    </svg>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

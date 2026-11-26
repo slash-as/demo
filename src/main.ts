@@ -6,6 +6,7 @@ import { apiClient } from './api/client';
 import { icon } from './ui/icons';
 import { initPwaInstall } from './pwa';
 import { App } from './ui/app';
+import { ThemeToggle } from './ui/theme-toggle';
 
 const ME_STORAGE_KEY = 'nebula:me';
 
@@ -190,7 +191,7 @@ function showSignupForm(email: string, password: string): void {
   boot.append(orb, title, signupForm, errorDiv);
 }
 
-// Funzione per mostrare il pulsante di logout nell'header
+// Funzione per mostrare il pulsante di logout e il toggle del tema nell'header
 function addLogoutButton(): void {
   const accountButton = document.querySelector('.account-button');
   if (!accountButton) return;
@@ -217,6 +218,19 @@ function addLogoutButton(): void {
 
     // Inserisci il pulsante prima dell'elemento esistente
     accountButton.insertBefore(logoutBtn, accountButton.firstChild);
+  }
+
+  // Aggiungi il toggle del tema
+  const themeToggle = new ThemeToggle();
+  const themeButton = themeToggle.render();
+  themeButton.className = 'btn btn-ghost btn-sm theme-btn';
+  themeButton.style.marginTop = '8px';
+  themeButton.style.marginLeft = '8px';
+  
+  // Inserisci il pulsante del tema dopo il pulsante di logout
+  if (accountButton.querySelector('.logout-btn')) {
+    const logoutBtn = accountButton.querySelector('.logout-btn');
+    accountButton.insertBefore(themeButton, logoutBtn.nextSibling);
   }
 }
 

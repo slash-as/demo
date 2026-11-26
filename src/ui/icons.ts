@@ -37,7 +37,9 @@ export type IconName =
   | 'logout'
   | 'lock'
   | 'info'
-  | 'shield';
+  | 'shield'
+  | 'sun'
+  | 'moon';
 
 const ICONS: Record<IconName, string> = {
   home: '<path d="m3 10.5 9-7.5 9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/>',
