@@ -8,6 +8,7 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build": "node scripts/build.mjs",
+    "build:new": "node scripts/build-new.mjs",
     "preview": "vite preview",
     "db:setup": "node scripts/db-setup.mjs",
     "db:migrate": "node scripts/db-setup.mjs --schema-only",

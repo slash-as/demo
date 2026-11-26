@@ -1,7 +1,6 @@
-import * as database from '../db/database';
-import * as repo from '../db/repo';
-import { SCHEMA_SQL } from '../db/schema';
-import type { FeedScope, PostView, User, UserSuggestion } from '../types';
+import * as apiDatabase from '../api/database';
+import * as repo from '../api/repo';
+import type { FeedScope, PostView, User, UserSuggestion } from '../api/repo';
 import { canInstall, promptInstall } from '../pwa';
 import {
   avatar,
@@ -47,18 +46,21 @@ export class App {
   private readonly state: AppState;
   private me: User;
 
-  constructor(meId: number) {
+  constructor() {
     const root = document.querySelector<HTMLElement>('#app');
     if (!root) throw new Error('Elemento #app non trovato.');
 
-    const me = repo.getUser(meId);
-    if (!me) throw new Error('Utente demo non trovato.');
+    // Ottieni l'utente corrente dall'API
+    const currentUser = apiDatabase.getCurrentUser();
+    if (!currentUser) {
+      throw new Error('Nessun utente autenticato. Effettua il login prima di continuare.');
+    }
 
     this.root = root;
-    this.me = me;
+    this.me = currentUser;
     this.state = {
       view: 'home',
-      meId: me.id,
+      meId: currentUser.id,
       feedTab: 'all',
       profileUsername: null,
       commentsOpen: new Set<number>(),
@@ -71,7 +73,20 @@ export class App {
       resetArmed: false,
     };
 
-    this.bindEvents();
+    // Carica i dati iniziali
+    this.loadData().then(() => {
+      this.bindEvents();
+    });
+  }
+
+  private async loadData(): Promise<void> {
+    try {
+      await apiDatabase.refresh();
+      this.render();
+    } catch (error) {
+      console.error('Failed to load initial data:', error);
+      this.notify('Errore nel caricamento dei dati', 'error');
+    }
   }
 
   mount(): void {
@@ -121,8 +136,8 @@ export class App {
     this.root.addEventListener('keydown', (event) => this.handleKeydown(event));
   }
 
-  private refreshMe(): User {
-    const me = repo.getUser(this.state.meId);
+  private async refreshMe(): Promise<User> {
+    const me = apiDatabase.getCurrentUser();
     if (!me) throw new Error('Utente corrente non trovato.');
     this.me = me;
     return me;
@@ -274,16 +289,16 @@ export class App {
     `;
   }
 
-  private renderHome(me: User): string {
-    const posts = repo.listFeed(me.id, this.state.feedTab);
-    const stats = repo.getStats();
+  private async renderHome(me: User): Promise<string> {
+    const posts = await apiDatabase.listFeed(me.id, this.state.feedTab);
+    const stats = await apiDatabase.getStats();
 
     return `
       <header class="view-head">
         <div>
           <span class="eyebrow">${greeting()}, ${escapeHtml(displayName(me.username))}</span>
           <h1>La tua <span class="grad-text">orbita</span></h1>
-          <p>La timeline della demo. Tutto vive nel tuo browser.</p>
+          <p>La timeline del social network. Connesso con il backend su Neon.</p>
         </div>
         <div class="live-pill"><span class="live-dot"></span> ${stats.posts} post live</div>
       </header>
@@ -461,13 +476,13 @@ export class App {
     `;
   }
 
-  private renderExplore(me: User): string {
+  private async renderExplore(me: User): Promise<string> {
     return `
       <header class="view-head">
         <div>
           <span class="eyebrow">Scopri</span>
           <h1>Nuove <span class="grad-text">costellazioni</span></h1>
-          <p>Persone, idee e post che stanno girando nella demo.</p>
+          <p>Persone, idee e post che stanno girando nel social network.</p>
         </div>
       </header>
 
